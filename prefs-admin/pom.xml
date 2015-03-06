@@ -66,12 +66,12 @@
             <artifactId>prefs-testing</artifactId>
             <classifier>tests</classifier>
         </dependency>
-		<!--
         <dependency>
             <groupId>com.adobe.prefs</groupId>
             <artifactId>prefs-zookeeper</artifactId>
             <version>${project.version}</version>
         </dependency>
+		<!--
         <dependency>
             <groupId>com.adobe.prefs</groupId>
             <artifactId>prefs-etcd</artifactId>

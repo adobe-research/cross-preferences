@@ -8,8 +8,8 @@
     <modules>
         <module>prefs-testing</module>
         <module>prefs-admin</module>
-        <!--
         <module>prefs-zookeeper</module>
+        <!--
         <module>prefs-etcd</module>
         <module>prefs-consul</module>
         -->
