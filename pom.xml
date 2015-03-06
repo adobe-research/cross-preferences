@@ -7,8 +7,8 @@
     <version>0.2.0-SNAPSHOT</version>
     <modules>
         <module>prefs-testing</module>
-        <!--
         <module>prefs-admin</module>
+        <!--
         <module>prefs-zookeeper</module>
         <module>prefs-etcd</module>
         <module>prefs-consul</module>
