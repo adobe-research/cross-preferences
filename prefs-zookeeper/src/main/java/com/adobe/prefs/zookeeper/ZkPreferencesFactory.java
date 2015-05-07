@@ -27,14 +27,14 @@ public class ZkPreferencesFactory implements PreferencesFactory {
         final boolean encodedBinary = Boolean.parseBoolean(System.getProperty("prefs.zk.binary.base64_encoded", "true"));
         logger.info("Zookeeper prefs factory initialized with system root: {} and user root: {}",
                 systemRootPath, userRootPath);
-        userRootSupplier = Suppliers.memoize(prefsSupplier(userRootPath, encodedBinary));
-        systemRootSupplier = Suppliers.memoize(prefsSupplier(systemRootPath, encodedBinary));
+        userRootSupplier = Suppliers.memoize(prefsSupplier(userRootPath, encodedBinary, true));
+        systemRootSupplier = Suppliers.memoize(prefsSupplier(systemRootPath, encodedBinary, false));
     }
 
-    private Supplier<ZkPreferences> prefsSupplier(String path, final boolean encodedBinary) {
+    private Supplier<ZkPreferences> prefsSupplier(String path, final boolean encodedBinary, final boolean userNode) {
         return Suppliers.compose(new Function<CuratorFramework, ZkPreferences>() {
             @Override public ZkPreferences apply(final CuratorFramework curator) {
-                final ZkPreferences prefs = new ZkPreferences(curator, encodedBinary);
+                final ZkPreferences prefs = new ZkPreferences(curator, encodedBinary, userNode);
                 return prefs.registerInBackingStore();
             }
         }, ZkManager.curatorFacadeSupplier(path));

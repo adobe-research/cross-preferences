@@ -83,6 +83,7 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
 
     final CuratorFramework curator;
 
+    private final boolean userNode;
     private final boolean encodedBinary;
 
     private final PathChildrenCache pcc;
@@ -95,8 +96,8 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
      * @param curator
      * @param encodedBinary
      */
-    ZkPreferences(CuratorFramework curator, boolean encodedBinary) {
-        this(curator, null, "", encodedBinary);
+    ZkPreferences(CuratorFramework curator, boolean encodedBinary, boolean userNode) {
+        this(curator, null, "", encodedBinary, userNode);
     }
 
     /**
@@ -106,9 +107,11 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
      * @param name
      * @param encodedBinary
      */
-    private ZkPreferences(CuratorFramework curator, ZkPreferences parent, String name, boolean encodedBinary) {
+    private ZkPreferences(CuratorFramework curator, ZkPreferences parent, String name,
+                          boolean encodedBinary, boolean userNode) {
         super(parent, name);
         this.curator = curator;
+        this.userNode = userNode;
         this.encodedBinary = encodedBinary;
         pcc = new PathChildrenCache(curator, absolutePath(), true);
         newNode = true;
@@ -267,7 +270,7 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
     @Override
     protected AbstractPreferences childSpi(String name) {
         logger.trace("Getting child `{}` of {}", name, this);
-        final ZkPreferences child = new ZkPreferences(curator, this, name, encodedBinary);
+        final ZkPreferences child = new ZkPreferences(curator, this, name, encodedBinary, userNode);
         return child.registerInBackingStore();
     }
 
@@ -310,6 +313,11 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
         } catch (Exception e) {
             throw new BackingStoreException(e);
         }
+    }
+
+    @Override
+    public boolean isUserNode() {
+        return userNode;
     }
 
     @Override
