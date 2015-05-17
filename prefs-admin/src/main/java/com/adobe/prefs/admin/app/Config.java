@@ -36,19 +36,10 @@ public class Config extends WebMvcConfigurerAdapter {
               .mediaType("json", new MediaType("application", "hal+json"))
               .mediaType("html", MediaType.TEXT_HTML);
     }
-    @Bean
-    UserPrefsController userPrefsController() {
-        return new UserPrefsController();
-    }
 
     @Bean
-    SystemPrefsController systemPrefsController() {
-        return new SystemPrefsController();
-    }
-
-    @Bean
-    HomeController homeController() {
-        return new HomeController();
+    PrefsController prefsController() {
+        return new PrefsController();
     }
 
     @Bean

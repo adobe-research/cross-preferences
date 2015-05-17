@@ -1,11 +1,9 @@
 package com.adobe.prefs.admin.infra;
 
-import com.adobe.prefs.admin.core.HomeResource;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
 import freemarker.template.TemplateException;
 import freemarker.template.TemplateExceptionHandler;
-import org.springframework.hateoas.Resource;
 import org.springframework.hateoas.ResourceSupport;
 import org.springframework.http.HttpInputMessage;
 import org.springframework.http.HttpOutputMessage;
@@ -23,11 +21,9 @@ import java.io.Writer;
  */
 public class HtmlMessageConverter extends AbstractHttpMessageConverter<ResourceSupport> {
 
-    private static final String HOME_TEMPLATE = "com/adobe/prefs/admin/infra/home-template.ftl";
-    private static final String PREFS_TEMPLATE = "com/adobe/prefs/admin/infra/prefs-template.ftl";
+    private static final String TEMPLATE = "com/adobe/prefs/admin/infra/prefs-template.ftl";
 
-    final Template homeTemplate;
-    final Template prefsTemplate;
+    final Template template;
 
     public HtmlMessageConverter() {
         super(MediaType.TEXT_HTML);
@@ -35,8 +31,7 @@ public class HtmlMessageConverter extends AbstractHttpMessageConverter<ResourceS
         config.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
         config.setClassForTemplateLoading(getClass(), "/");
         try {
-            homeTemplate = config.getTemplate(HOME_TEMPLATE);
-            prefsTemplate = config.getTemplate(PREFS_TEMPLATE);
+            template = config.getTemplate(TEMPLATE);
         } catch (IOException e) {
             throw new IllegalStateException(e);
         }
@@ -53,14 +48,10 @@ public class HtmlMessageConverter extends AbstractHttpMessageConverter<ResourceS
     }
 
     @Override
-    protected void writeInternal(ResourceSupport resourceSupport, HttpOutputMessage outputMessage) throws IOException, HttpMessageNotWritableException {
+    protected void writeInternal(ResourceSupport resource, HttpOutputMessage outputMessage) throws IOException, HttpMessageNotWritableException {
         final Writer writer = new OutputStreamWriter(outputMessage.getBody());
         try {
-            if (resourceSupport instanceof HomeResource) {
-                homeTemplate.process(resourceSupport, writer);
-            } else {
-                prefsTemplate.process(resourceSupport, writer);
-            }
+            template.process(resource, writer);
         } catch (TemplateException e) {
             throw new IllegalArgumentException(e);
         }

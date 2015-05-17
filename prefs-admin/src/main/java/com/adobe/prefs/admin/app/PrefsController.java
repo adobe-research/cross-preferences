@@ -13,62 +13,102 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.prefs.BackingStoreException;
+import java.util.prefs.InvalidPreferencesFormatException;
 import java.util.prefs.Preferences;
 
 import static org.springframework.http.HttpStatus.*;
 
 @Controller
-abstract class PrefsController {
+@RequestMapping("/**")
+class PrefsController {
 
     protected final Logger logger = LoggerFactory.getLogger(getClass());
 
-    private final String realm;
-    private final Preferences root;
+    enum PreferencesRoot {
+        usr(Preferences.userRoot()),
+        sys(Preferences.systemRoot());
 
-    protected PrefsController(String realm, Preferences root) {
-        this.root = root;
-        this.realm = realm;
+        private final Preferences prefs;
+
+        PreferencesRoot(final Preferences prefs) {
+            this.prefs = prefs;
+        }
+
+        @Override
+        public String toString() {
+            return '/' + name();
+        }
     }
 
-    @RequestMapping(value = "/**", method = RequestMethod.GET)
+    @RequestMapping(value = "/", method = RequestMethod.GET)
+    String redirect() {
+        return "redirect:" + PreferencesRoot.usr.toString() + '/';
+    }
+
+    @RequestMapping("/*.*")
+    @ResponseStatus(NOT_FOUND)
+    void notFound() {}
+
+    @RequestMapping(value = "/", method = RequestMethod.POST,
+            consumes = {MediaType.TEXT_XML_VALUE, MediaType.APPLICATION_XML_VALUE})
     @ResponseBody
-    ResourceSupport getPreference(HttpServletRequest request) throws BackingStoreException {
-        final PrefSpec prefSpec = new PrefSpec(request);
-        if (!root.nodeExists(prefSpec.nodePath)) {
+    ResponseEntity<Void> importPreferences(InputStream in) throws IOException, InvalidPreferencesFormatException {
+        logger.info("Importing preferences from file...");
+        Preferences.importPreferences(in);
+        logger.info("Preferences import succeeded");
+        return seeOtherResponse("/");
+    }
+
+    @RequestMapping(value = "/", method = RequestMethod.POST,
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseBody
+    ResponseEntity<Void> importPreferences(@RequestParam MultipartFile file) throws IOException, InvalidPreferencesFormatException {
+        return importPreferences(file.getInputStream());
+    }
+
+    @RequestMapping(value = "/{root}/**", method = RequestMethod.GET)
+    @ResponseBody
+    ResourceSupport getPreference(@PathVariable PreferencesRoot root, HttpServletRequest request) throws BackingStoreException {
+        final PrefSpec prefSpec = new PrefSpec(root, request);
+        if (!root.prefs.nodeExists(prefSpec.nodePath)) {
             throw new ResourceNotFoundException(prefSpec.nodePath);
         }
-        final Preferences prefs = root.node(prefSpec.nodePath);
+        final Preferences prefs = root.prefs.node(prefSpec.nodePath);
         if (prefSpec.key == null) {
-            return new NodeResource(realm, prefs);
+            return new NodeResource(root.toString(), prefs);
         } else {
             if (! Arrays.asList(prefs.keys()).contains(prefSpec.key) ) {
                 throw new ResourceNotFoundException();
             }
-            return new PrefResource(realm, prefs, prefSpec.key, true);
+
+            return new PrefResource(root.toString(), prefs, prefSpec.key, true);
         }
     }
 
 
-    @RequestMapping(value = "/**", method = RequestMethod.PUT)
+    @RequestMapping(value = "/{root}/**", method = RequestMethod.PUT)
     @ResponseBody
-    ResponseEntity<Void> setPreference(HttpServletRequest request, @RequestParam(required = false) String value) throws BackingStoreException {
-        final PrefSpec prefSpec = new PrefSpec(request);
-        Preferences prefs = root.node(prefSpec.nodePath);
+    ResponseEntity<Void> setPreference(@PathVariable PreferencesRoot root, HttpServletRequest request, @RequestParam(required = false) String value) throws BackingStoreException {
+        final PrefSpec prefSpec = new PrefSpec(root, request);
+        Preferences prefs = root.prefs.node(prefSpec.nodePath);
         if (prefSpec.key != null) {
             if (value == null) {
                 throw new NoValueException(prefSpec.key);
@@ -82,13 +122,13 @@ abstract class PrefsController {
         return seeOtherResponse(prefSpec);
     }
 
-    @RequestMapping(value = "/**", method = RequestMethod.DELETE)
-    ResponseEntity<Void> removePreference(HttpServletRequest request) throws BackingStoreException {
-        final PrefSpec prefSpec = new PrefSpec(request);
-        if (! root.nodeExists(prefSpec.nodePath) ) {
+    @RequestMapping(value = "/{root}/**", method = RequestMethod.DELETE)
+    ResponseEntity<Void> removePreference(@PathVariable PreferencesRoot root, HttpServletRequest request) throws BackingStoreException {
+        final PrefSpec prefSpec = new PrefSpec(root, request);
+        if (! root.prefs.nodeExists(prefSpec.nodePath) ) {
             throw new ResourceNotFoundException(prefSpec.nodePath);
         }
-        Preferences prefs = root.node(prefSpec.nodePath);
+        Preferences prefs = root.prefs.node(prefSpec.nodePath);
         if (prefSpec.key != null) {
             if (! Arrays.asList(prefs.keys()).contains(prefSpec.key) ) {
                 throw new ResourceNotFoundException(prefSpec.key);
@@ -100,16 +140,16 @@ abstract class PrefsController {
         return seeOtherResponse(prefSpec);
     }
 
-    @RequestMapping(value = "/**", method = RequestMethod.GET, params = "export", produces = MediaType.APPLICATION_XML_VALUE)
-    void export(HttpServletRequest request,
+    @RequestMapping(value = "/{root}/**", method = RequestMethod.GET, params = "export", produces = MediaType.APPLICATION_XML_VALUE)
+    void export(@PathVariable PreferencesRoot root, HttpServletRequest request,
                 HttpServletResponse response,
                 @RequestParam String[] export) throws BackingStoreException, IOException {
         final Set<String> exportOptions = new HashSet<>(Arrays.asList(export));
-        final PrefSpec prefSpec = new PrefSpec(request);
-        if (!root.nodeExists(prefSpec.nodePath)) {
+        final PrefSpec prefSpec = new PrefSpec(root, request);
+        if (!root.prefs.nodeExists(prefSpec.nodePath)) {
             throw new ResourceNotFoundException(prefSpec.nodePath);
         }
-        Preferences prefs = root.node(prefSpec.nodePath);
+        Preferences prefs = root.prefs.node(prefSpec.nodePath);
         final boolean shallow = exportOptions.contains("shallow");
         response.setContentType("application/xml");
         if (exportOptions.contains("file")) {
@@ -127,15 +167,25 @@ abstract class PrefsController {
     }
 
     ResponseEntity<Void> seeOtherResponse(PrefSpec prefSpec) {
+        return seeOtherResponse(Paths.parent(Paths.path(prefSpec.root.toString(), prefSpec.nodePath, prefSpec.key)));
+    }
+
+    ResponseEntity<Void> seeOtherResponse(String location) {
         HttpHeaders headers = new HttpHeaders();
-        headers.set("Location", Paths.parent(Paths.path(realm, prefSpec.nodePath, prefSpec.key)));
+        headers.set("Location", location);
         return new ResponseEntity<>(headers, HttpStatus.SEE_OTHER);
     }
 
     @ExceptionHandler
     @ResponseStatus(BAD_REQUEST)
     public void badRequest(IllegalArgumentException e) {
-        logger.error(BAD_REQUEST.getReasonPhrase(), e);
+        logger.warn(BAD_REQUEST.getReasonPhrase(), e);
+    }
+
+    @ExceptionHandler
+    @ResponseStatus(NOT_FOUND)
+    public void notFound(ResourceNotFoundException e) {
+        logger.info(NOT_FOUND.getReasonPhrase(), e);
     }
 
     @ExceptionHandler
@@ -157,13 +207,14 @@ abstract class PrefsController {
     }
 
     class PrefSpec {
+        final PreferencesRoot root;
         final String nodePath;
         final String key;
 
-        PrefSpec(HttpServletRequest request) {
-          final String requestPath = UrlIO.DECODER.apply(request.getRequestURI());
-          if (requestPath != null && requestPath.startsWith(realm)) {
-                String path = requestPath.substring(realm.length());
+        PrefSpec(final PreferencesRoot root, HttpServletRequest request) {
+            final String requestPath = UrlIO.DECODER.apply(request.getRequestURI());
+            if (requestPath != null && requestPath.startsWith(root.toString())) {
+                String path = requestPath.substring(root.toString().length());
                 if (path.isEmpty() || !path.startsWith("/")) {
                     path = "/" + path;
                 }
@@ -173,6 +224,7 @@ abstract class PrefsController {
             } else {
                 throw new IllegalArgumentException();
             }
+            this.root = root;
         }
 
     }

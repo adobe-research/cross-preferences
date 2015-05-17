@@ -5,11 +5,17 @@ import org.mockito.internal.matchers.StartsWith;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.http.converter.xml.Jaxb2CollectionHttpMessageConverter;
 import org.springframework.http.converter.xml.Jaxb2RootElementHttpMessageConverter;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
+import static java.lang.ClassLoader.getSystemResourceAsStream;
+import static java.nio.file.Files.readAllBytes;
 import static org.springframework.http.MediaType.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -17,8 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 public class PrefsControllerTest {
 
     final MockMvc mvc = MockMvcBuilders.standaloneSetup(
-            new UserPrefsController(),
-            new SystemPrefsController()
+            new PrefsController()
     ).setMessageConverters(
             new Jaxb2RootElementHttpMessageConverter(),
             new Jaxb2CollectionHttpMessageConverter<>(),
@@ -110,11 +115,37 @@ public class PrefsControllerTest {
                 .andExpect(header().string("Content-Disposition", new StartsWith("attachment;")));
     }
 
+
+    @Test
+    public void shouldRedirectToUserRoot() throws Exception {
+        mvc.perform(get("/"))
+                .andExpect(status().is(302))
+                .andExpect(header().string("Location", "/usr/"));
+    }
+
+    @Test
+    public void shouldUploadInlineXml() throws Exception {
+        final Path path = Paths.get(ClassLoader.getSystemResource("usr.xml").toURI());
+        mvc.perform(post("/").contentType(APPLICATION_XML).content(readAllBytes(path)))
+                .andExpect(status().is(303))
+                .andExpect(header().string("Location", "/"));
+    }
+
+    @Test
+    public void shouldUploadXmlFile() throws Exception {
+        final MockMultipartFile file = new MockMultipartFile("file", "prefs.xml",
+                APPLICATION_XML_VALUE, getSystemResourceAsStream("sys.xml"));
+        mvc.perform(fileUpload("/").file(file))
+                .andExpect(status().is(303))
+                .andExpect(header().string("Location", "/"));
+    }
+
+
     @DataProvider
     public Object[][] prefs() {
         return new String[][] {
-                { "/v1/usr/test/" },
-                { "/v1/sys/test/" }
+                { "/usr/test/" },
+                { "/sys/test/" }
         };
     }
 

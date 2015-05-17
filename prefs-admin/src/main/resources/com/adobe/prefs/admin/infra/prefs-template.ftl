@@ -3,195 +3,258 @@
 <html>
 <head>
     <title>Preferences Console</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap-theme.min.css">
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/x-editable/1.5.0/bootstrap3-editable/css/bootstrap-editable.css"/>
     <style>
-        body {
-            font-family: Consolas, Menlo, Monaco, Lucida Console, Liberation Mono,
-                DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace, serif;
-            text-align: center; background-color: #565656; color: #A9B7C6;
+        a.clickable-tab {
+            color: #337ab7 !important;
         }
 
-        h1 { background-color: #363636; }
-
-        h1 table { font-size: inherit; text-align: center; }
-
-        a { color: #c99065; text-decoration: none; font-weight: bold; }
-
-        a:hover { color: #ffc66d; text-decoration: underline; }
-
-        a.btn, input[type="button"], input[type="submit"] {
-            background-color: #646464; padding: 1% 40%; color: #c99065; font-weight: normal;
-            font-size: 100%; border: none; cursor: pointer; cursor: hand; margin: 0;
+        a.clickable-tab:hover {
+            cursor: pointer !important;
+            color: #439be9 !important;
         }
 
-        a.btn:hover, input[type="button"]:hover, input[type="submit"]:hover {
-            background-color: #5a5a5a; color: #ffc66d; text-decoration: none;
+        .float-right {
+            display: inline-block;
+            float: right;
         }
 
-        form { display: inline; }
-
-        div.tree { float: left; width: 25%; text-align: center; background-color: #363636; border: 1px solid #aaaaaa; }
-
-        div.keys { float: right; width: 70%; text-align: right; background-color: #323232; border: 1px solid #aaaaaa; }
-
-        div.tree a { font-size: larger; }
-        td.child input { font-weight: bold; font-size: larger; }
-
-        input, textarea {
-            font-family: Menlo, Consolas, Monaco, Lucida Console, Liberation Mono,
-                DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace, serif;
-            background-color: #2b2b2b; border: solid 1px #cccccc; color: #efefef; font-size: inherit; width: 100%;
+        .pref-key {
+            width: 40%;
+            white-space: nowrap;
         }
 
-        input.add-key { font-weight: bold; text-align: right; }
+        .pref-button {
+            text-align: right;
+            width: 5%;
+        }
 
-        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        #current-child:hover {
+            text-decoration: line-through;
+            cursor: hand;
+            color: #d9534f;
+        }
 
-        table tr td, table tr th { padding: 1%; }
+        #remove-child .modal-header {
+            font-size: smaller;
+        }
 
-        div.content { overflow: auto; max-width: 100%; }
-
-        table tr th { border-bottom: 1px solid #555555; }
-
-        div.children table tr th { padding: 3%; text-align: left }
-        .child { width: 85%; padding: 3%; }
-        .add-child { width: 15%; padding: 3%; }
-
-        td.parent {width: 12%; text-align: center; vertical-align: middle; margin: 10%; }
-        td.nodepath { width: 74%; text-align: center; }
-        td.export, td.rmnode { text-align: center; vertical-align: middle;  margin: 10%; }
-        td.export { width: 8%; font-size: 80%; }
-        td.rmnode { width: 6%; font-size: 60%; }
-
-        .pref-key { width: 38%; text-align: right; padding: 1%; font-weight: bold; }
-        .pref-value { width: 50%; padding: 1%; text-align: left; }
-        .savebtn, .delbtn { width: 6%; }
-
-        div.zoom { text-align: center; margin: 8% 10%; }
-        div.zoom input[type="submit"] { width: 10%; padding: 1% 3%; background-color: #484848; font-size: xx-large; }
-        div.zoom input[type="submit"]:hover { background-color: #404040; }
+        #remove-child .modal-body {
+            font-size: small;
+        }
 
     </style>
+    <script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/x-editable/1.5.0/bootstrap3-editable/js/bootstrap-editable.min.js"></script>
 
     <script>
-        function validateKey(form) {
-            if (form.elements['key'].value) {
-                form.action = document.location + form.elements['key'].value + '?_method=put';
-                return true
-            } else {
-                alert('Error: empty key!');
-                return false
-            }
-        }
+        $.fn.editable.defaults.ajaxOptions = {type: "PUT"};
+        $.fn.editable.defaults.send = "always";
+
+        $(function () {
+            $('#add-child').submit(function (ev) {
+                if (ev.target.elements['child'].value) {
+                    ev.target.action = document.location + ev.target.elements['child'].value + '/?_method=put';
+                    return true;
+                } else {
+                    $('#no-input').modal('show');
+                    return false;
+                }
+            });
+            $('#save-pref').click(function () {
+                $('#change-pref').submit();
+            });
+            $('#change-pref').submit(function (ev) {
+                if (ev.target.elements['key'].value) {
+                    ev.target.action = document.location + ev.target.elements['key'].value + '?_method=put';
+                    if ($('#new-value').hasClass('editable-unsaved')) {
+                        ev.target.elements['value'].value = $('#new-value').text();
+                    }
+                    return true;
+                } else {
+                    $('#no-input').modal('show');
+                    return false;
+                }
+            });
+            $('.editable-value').editable({
+                title: 'Edit value',
+                rows: 5,
+                columns: 80
+            });
+        });
     </script>
 </head>
 <body>
-<h1>
-    <table class="top">
-        <tr>
-            <#assign hasParent = (links?size > 1 && links[1].rel == "parent" && links[1].href?length < links[0].href?length)>
-            <td class="parent">
-                <#if hasParent>
-                    <a class="btn" href="${links[1].href}" title="parent">&#x25b2</a>
-                <#else>
-                    <a class="btn" title="home" href="..">&#x25E4</a>
-                </#if>
-            </td>
-            <td class="nodepath">
-                <#assign nodePath = links[0].href?remove_beginning("/v1")>
-                <div class="content">${nodePath}</div>
-            </td>
-            <#if name??>
-            <td class="export">
-                <a class="btn" href="${links[0].href}?export=file" title="export">&#x2B07</a>
-            </td><td class="rmnode">
-                <#if hasParent>
-                    <form method="post" action="${links[0].href}?_method=delete"
-                          onsubmit="return confirm('Remove ${name}?')">
-                        <input type="submit" value="&#x2718" title="remove">
-                    </form>
-                </#if>
-            </td>
-            <#else>
-            <td colspan="2"></td>
+    <#assign isSystemNode = links[0].href?starts_with('/sys')/>
+    <#assign rootPath = isSystemNode?string('/sys', '/usr')>
+<div class="container">
+    <#assign segments = links[0].href?remove_beginning(rootPath)?remove_ending('/')?split('/')>
+    <form class="navbar-form navbar-right float-right" role="search" action="/" method="post"
+          enctype="multipart/form-data">
+        <div class="input-group" role="group">
+            <span class="input-group-addon">
+                <span class="glyphicon glyphicon-import"></span>
+            </span>
+            <input type="file" class="form-control" name="file" accept="application/xml,text/xml"/>
+            <span class="input-group-btn">
+                <button type="submit" class="btn btn-default">Import</button>
+            </span>
+        </div>
+    </form>
+    <h3 class="row" role="navigation">
+        <#assign rootclass= (segments?size == 1)?string('', 'clickable-tab')>
+        <ul class="nav nav-tabs">
+            <li title="System Preferences" role="presentation" class="${isSystemNode?string('active', '')}">
+                <a class="${isSystemNode?string(rootclass, '')}" href="/sys/"><span
+                        class="glyphicon glyphicon-cloud"></a>
+            </li>
+            <li title="User Preferences" role="presentation" class="${isSystemNode?string('', 'active')}">
+                <a class="${isSystemNode?string('', rootclass)}" href="/usr/"><span
+                        class="glyphicon glyphicon-user"></a>
+            </li>
+        </ul>
+        <ol class="breadcrumb">
+            <#if segments?size == 1>
+                <li class="active"></li>
             </#if>
-        </tr>
-    </table>
-    <hr/>
-</h1>
-<#if nodePath?ends_with("/")>
-<div class="tree">
-    <div class="children">
-        <table>
-            <tr>
-                <th class="child">Children</th>
-                <th class="add-child"></th>
-            </tr>
-            <#list links as link>
-                <#if (link.href?length > links[0].href?length) >
-                    <tr>
-                        <td class="child">
-                            <#assign basename = link.href?replace(links[0].href, "")>
-                            <div class="content"><a href="${link.href}">${link.rel}</a></div>
-                        </td>
-                        <td class="add-child"></td>
-                    </tr>
+            <#list segments as item>
+                <#if item_has_next>
+                    <li><a href="${rootPath}${segments[0..item_index]?join('/')}/">${item}</a></li>
+                <#else>
+                    <li class="active">
+                        <span id="current-child" data-toggle="modal" data-target="#remove-child"
+                              title="Remove">${item}</span>
+
+                        <div class="modal fade" id="remove-child" tabindex="-1" role="dialog"
+                             aria-labelledby="myModalLabel" aria-hidden="true">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        Remove ${item} ?
+                                    </div>
+                                    <div class="modal-body">
+                                        This will remove the current node and all its descendants!
+                                    </div>
+                                    <div class="modal-footer">
+                                        <form action="${links[0].href}?_method=delete" method="post">
+                                            <button type="button" class="btn btn-default" data-dismiss="modal">Cancel
+                                            </button>
+                                            <button type="submit" class="btn btn-danger btn-ok">Remove</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </li>
                 </#if>
             </#list>
-            <tr>
-                <form method="post"
-                      onsubmit="this.action = document.location + elements['child'].value + '/?_method=put'">
-                    <td class="child">
-                        <input type="text" name="child" maxlength="80"/>
-                    </td>
-                    <td class="add-child">
-                        <input type="submit" value="&#x2714" title="add"/>
-                    </td>
-                </form>
-            </tr>
-        </table>
+            <form class="float-right" action="${links[0].href}">
+                <input type="hidden" name="export" value="file"/>
+                <button type="submit" class="btn btn-default" title="Export">
+                    <span class="glyphicon glyphicon-export"></span>
+                </button>
+            </form>
+        </ol>
+    </h3>
+    <div class="row">
+        <div class="col-sm-3">
+            <div class="panel panel-default">
+            <#--<#if links?size gt 1 && links[1].href != rootPath + '/'><#assign extra = 1><#else><#assign extra = 0></#if>-->
+            <#--<h3>${links?size} - ${segments?size} - ${extra}</h3>-->
+                <div class="panel-heading">Children</div>
+                <div class="panel-body">
+                    <div class="list-group">
+                        <#list links as link>
+                            <#if (link.href?length gt links[0].href?length)>
+                                <#assign basename = link.href?replace(links[0].href, "")>
+                                <a class="list-group-item" href="${link.href}"><strong>${link.rel}</strong></a>
+                            </#if>
+                        </#list>
+                    </div>
+                    <form id="add-child" method="post">
+                        <div class="input-group" role="group">
+                            <span class="input-group-addon">
+                                <span class="glyphicon glyphicon-plus"></span>
+                            </span>
+                            <input name="child" type="text" class="form-control" placeholder="Child name..."/>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-9">
+            <div class="panel panel-default">
+                <div class="panel-heading">Preferences</div>
+                <div class="modal fade" id="no-input" tabindex="-1" role="dialog" aria-labelledby="myModalLabel"
+                     aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span
+                                        aria-hidden="true">&times;</span></button>
+                                <h4 class="modal-title" id="myModalLabel">Invalid input</h4>
+                            </div>
+                            <div class="modal-body">
+                                The keys / child names don't make much sense, do they?
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <table class="table">
+                        <#list content as pref>
+                            <tr class="pref-key">
+                                <td>${pref.key}</td>
+                                <td class="pref-value">
+                                    <a href="#" class="editable-value" data-type="textarea" data-name="value"
+                                       data-url="${pref.links[0].href}?_method=put">${pref.value}</a>
+                                </td>
+                                <td class="pref-button">
+                                    <form action="${pref.links[0].href}?_method=delete" method="post">
+                                        <button type="submit" class="btn btn-default" title="Remove ${pref.key}">
+                                            <span class="glyphicon glyphicon-minus"></span>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        </#list>
+                        <tr>
+                            <td class="pref-key">
+                                <form id="change-pref" method="post" style="display: inline;">
+                                    <div class="input-group">
+                                        <span class="input-group-addon">
+                                            <span class="glyphicon glyphicon-plus"></span>
+                                        </span>
+                                        <input type="text" class="form-control" name="key" maxlength="80"
+                                               placeholder="Key..."/>
+                                    </div>
+                                    <input type="hidden" name="value"/>
+                                </form>
+                            </td>
+                            <td class="pref-value">
+                                <a href="#" id="new-value" class="editable-value" data-type="textarea"
+                                   data-name="value"></a>
+                            </td>
+                            <td class="pref-button">
+                                <button id="save-pref" type="submit" class="btn btn-default">
+                                    <span class="glyphicon glyphicon-ok"/>
+                                </button>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
-<div class="keys">
-    <table>
-        <tr>
-            <th class="pref-key">Key</th>
-            <th class="pref-value">Value</th>
-            <th class="savebtn"></th>
-            <th class="delbtn"></th>
-        </tr>
-        <#list content as pref>
-            <tr>
-                <form method="post" action="${pref.links[0].href}?_method=put">
-                    <td class="pref-key"><div class="content"><a href="${pref.links[0].href}">${pref.key}</a></div></td>
-                    <td class="pref-value"><input type="text" name="value"
-                                                  onchange="this.form.elements['apply'].value='&#x23ce'" value="${pref.value}"
-                                                  maxlength="4096"/></td>
-                    <td class="savebtn"><input name="apply" type="submit" value="&#x2713" title="save"/></td>
-                </form>
-                <form method="post" action="${pref.links[0].href}?_method=delete">
-                    <td class="delbtn"><input type="submit" value="&#x2717" title="remove"/></td>
-                </form>
-            </tr>
-        </#list>
-        <tr>
-            <form method="post" onsubmit="return validateKey(this)">
-                <td class="pref-key"><input class="add-key" type="text" name="key" maxlength="80"/></td>
-                <td class="pref-value"><input type="text" name="value" maxlength="4096"/></td>
-                <td><input type="submit" value="&#x2713" title="add"/></td>
-                <td></td>
-            </form>
-        </tr>
-    </table>
-</div>
-<#else>
-<div class="zoom">
-<form method="post" action="?_method=put">
-    <textarea rows="15" name="value" maxlength="4096">${value}</textarea>
-    <br/><br/>
-    <input name="apply" type="submit" value="&#x2714" title="save"/>
-</form>
-</div>
-</#if>
 </body>
 </html>
 </#escape>
