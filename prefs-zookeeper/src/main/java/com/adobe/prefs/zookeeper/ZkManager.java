@@ -11,7 +11,6 @@ import org.slf4j.LoggerFactory;
 
 import static com.adobe.prefs.zookeeper.ZkUtils.namespace;
 
-
 /**
  * Class responsible with creating (and destroying on shutdown) a zookeeper client that
  * can (and <b>is recommended to be</b>) shared throughout the application.
