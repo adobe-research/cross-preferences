@@ -41,7 +41,7 @@ import static org.apache.zookeeper.KeeperException.NotEmptyException;
  * (file-like entries or keys) and <em>children</em> (directory-like entries),
  * since the ZooKeeper nodes are designed to work as both.
  *
- * The actual heuristic is encapsulsted in the {@link #childFilter} and {@link #preferenceFilter} predicates.
+ * The actual heuristic is encapsulated in the {@link #childFilter} and {@link #preferenceFilter} predicates.
  *
  * However, both false positives and negatives are still possible.
  *

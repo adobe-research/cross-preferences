@@ -244,7 +244,7 @@
                             </td>
                             <td class="pref-button">
                                 <button id="save-pref" type="submit" class="btn btn-default">
-                                    <span class="glyphicon glyphicon-ok"/>
+                                    <span class="glyphicon glyphicon-ok"></span>
                                 </button>
                             </td>
                         </tr>

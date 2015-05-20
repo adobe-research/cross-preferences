@@ -11,7 +11,7 @@ no matter what preferences backing store is used.
 
 ### Introduction
 
-The goal is to allow Java (or any JVM language) developers to make use of higly available,
+The goal is to allow Java (or any JVM language) developers to make use of highly available,
 distributed configuration stores without the need to integrate with them directly.
 
 Out of the box, the Java Preferences API has platform-dependent backing stores that make use of registries
@@ -50,7 +50,7 @@ be linked by any application.
 In order to make use of it, one will only need to have it present in the JVM classpath (and provide any configuration
 settings via system properties), since the modules integrate with the preferences API via the `ServiceLoader` mechanism.
 
-However, if more than one prefs jar is present in the classpath for some reason, the actual implementatin to be used
+However, if more than one prefs jar is present in the classpath for some reason, the actual implementation to be used
 can be decided by setting the `java.util.prefs.PreferencesFactory` system property.
 
 

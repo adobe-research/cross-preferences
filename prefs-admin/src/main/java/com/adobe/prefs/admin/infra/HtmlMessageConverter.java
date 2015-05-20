@@ -16,9 +16,6 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 
-/**
- * Created by ciudatu on 7/26/14.
- */
 public class HtmlMessageConverter extends AbstractHttpMessageConverter<ResourceSupport> {
 
     private static final String TEMPLATE = "com/adobe/prefs/admin/infra/prefs-template.ftl";
