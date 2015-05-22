@@ -31,12 +31,6 @@
             width: 5%;
         }
 
-        #current-child:hover {
-            text-decoration: line-through;
-            cursor: hand;
-            color: #d9534f;
-        }
-
         #remove-child .modal-header {
             font-size: smaller;
         }
@@ -124,39 +118,41 @@
                 <#if item_has_next>
                     <li><a href="${rootPath}${segments[0..item_index]?join('/')}/">${item}</a></li>
                 <#else>
-                    <li class="active">
-                        <span id="current-child" data-toggle="modal" data-target="#remove-child"
-                              title="Remove">${item}</span>
-
-                        <div class="modal fade" id="remove-child" tabindex="-1" role="dialog"
-                             aria-labelledby="myModalLabel" aria-hidden="true">
-                            <div class="modal-dialog">
-                                <div class="modal-content">
-                                    <div class="modal-header">
-                                        Remove ${item} ?
-                                    </div>
-                                    <div class="modal-body">
-                                        This will remove the current node and all its descendants!
-                                    </div>
-                                    <div class="modal-footer">
-                                        <form action="${links[0].href}?_method=delete" method="post">
-                                            <button type="button" class="btn btn-default" data-dismiss="modal">Cancel
-                                            </button>
-                                            <button type="submit" class="btn btn-danger btn-ok">Remove</button>
-                                        </form>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </li>
+                    <li class="active">${item}</li>
+                    <#assign current_node = item>
                 </#if>
             </#list>
-            <form class="float-right" action="${links[0].href}">
+            <form action="${links[0].href}" class="float-right">
+                <#if current_node?length gt 0>
+                    <button type="button" class="btn btn-default" data-toggle="modal" data-target="#remove-child" title="Remove">
+                        <span class="glyphicon glyphicon-remove"></span>
+                    </button>
+                </#if>
                 <input type="hidden" name="export" value="file"/>
                 <button type="submit" class="btn btn-default" title="Export">
                     <span class="glyphicon glyphicon-export"></span>
                 </button>
             </form>
+            <div class="modal fade" id="remove-child" tabindex="-1" role="dialog"
+                 aria-labelledby="myModalLabel" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            Remove ${current_node} ?
+                        </div>
+                        <div class="modal-body">
+                            This will remove the current node and all its descendants!
+                        </div>
+                        <div class="modal-footer">
+                            <form action="${links[0].href}?_method=delete" method="post">
+                                <button type="button" class="btn btn-default" data-dismiss="modal">Cancel
+                                </button>
+                                <button type="submit" class="btn btn-danger btn-ok">Remove</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </ol>
     </h3>
     <div class="row">
@@ -198,7 +194,7 @@
                                 <h4 class="modal-title" id="myModalLabel">Invalid input</h4>
                             </div>
                             <div class="modal-body">
-                                The keys / child names don't make much sense, do they?
+                                Empty keys / child names don't make much sense, do they?
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
