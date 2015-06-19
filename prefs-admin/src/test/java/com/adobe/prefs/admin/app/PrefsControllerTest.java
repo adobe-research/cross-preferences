@@ -75,13 +75,15 @@ public class PrefsControllerTest {
     }
 
     @Test(dataProvider = "prefs", dependsOnMethods = "shouldCreateKey")
-    public void shouldReadKeyAsHtml(String p) throws Exception {
+    public void shouldReadKeyAsJson(String p) throws Exception {
         final String path = p + child + key;
-        mvc.perform(get(path).accept(TEXT_HTML))
-                .andExpect(status().is(200));
+        mvc.perform(get(path).accept(APPLICATION_JSON))
+                .andExpect(status().is(200))
+                .andExpect(jsonPath("key").value(key))
+                .andExpect(jsonPath("value").value("val"));
     }
 
-    @Test(dataProvider = "prefs", dependsOnMethods = "shouldReadKeyAsHtml")
+    @Test(dataProvider = "prefs", dependsOnMethods = "shouldReadKeyAsJson")
     public void shouldRemoveKey(String p) throws Exception {
         final String path = p + child + key;
         mvc.perform(delete(path))
