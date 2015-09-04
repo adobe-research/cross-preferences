@@ -60,7 +60,7 @@ class PrefsController {
 
     @RequestMapping(value = "/", method = RequestMethod.GET)
     String redirect() {
-        return "redirect:" + PreferencesRoot.usr.toString() + '/';
+        return "redirect:" + PreferencesRoot.sys.toString() + '/';
     }
 
     @RequestMapping("/*.*")

@@ -119,10 +119,10 @@ public class PrefsControllerTest {
 
 
     @Test
-    public void shouldRedirectToUserRoot() throws Exception {
+    public void shouldRedirectToSystemRoot() throws Exception {
         mvc.perform(get("/"))
                 .andExpect(status().is(302))
-                .andExpect(header().string("Location", "/usr/"));
+                .andExpect(header().string("Location", "/sys/"));
     }
 
     @Test
