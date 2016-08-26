@@ -45,7 +45,7 @@ public class TestZkServer extends ZooKeeperServerMain implements Runnable {
     public void run() {
         try {
             runFromConfig(config);
-        } catch (IOException e) {
+        } catch (Exception e) {
             throw Throwables.propagate(e);
         }
     }
