@@ -10,7 +10,6 @@ import java.util.prefs.Preferences;
 @XmlRootElement(name = "preference")
 public class PrefResource extends ResourceSupport {
 
-    private final Preferences parent;
     private final String key;
     private final String value;
 
@@ -19,7 +18,6 @@ public class PrefResource extends ResourceSupport {
     }
 
     public PrefResource(String realm, Preferences parent, String key, boolean withParentLink) {
-        this.parent = parent;
         this.key = key;
         this.value = parent.get(key, null);
         add(new Link(Paths.path(realm, parent.absolutePath(), key)));

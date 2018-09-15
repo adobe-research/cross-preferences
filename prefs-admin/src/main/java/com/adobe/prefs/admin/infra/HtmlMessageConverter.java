@@ -24,7 +24,7 @@ public class HtmlMessageConverter extends AbstractHttpMessageConverter<ResourceS
 
     public HtmlMessageConverter() {
         super(MediaType.TEXT_HTML);
-        Configuration config = new Configuration();
+        Configuration config = new Configuration(Configuration.getVersion());
         config.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
         config.setClassForTemplateLoading(getClass(), "/");
         try {

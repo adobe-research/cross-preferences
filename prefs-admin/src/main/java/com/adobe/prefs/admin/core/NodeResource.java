@@ -33,12 +33,7 @@ public class NodeResource extends Resources<PrefResource> {
         try {
             final String[] children = prefs.childrenNames();
             Arrays.sort(children);
-            add(Iterables.transform(Arrays.asList(children), new Function<String, Link>() {
-                @Override
-                public Link apply(String childName) {
-                    return new Link(Paths.path(realm, prefs.absolutePath(), childName, null), childName);
-                }
-            }));
+            add(Iterables.transform(Arrays.asList(children), childName -> new Link(Paths.path(realm, prefs.absolutePath(), childName, null), childName)));
         } catch (BackingStoreException e) {
             throw new RuntimeException(e);
         }
@@ -49,12 +44,7 @@ public class NodeResource extends Resources<PrefResource> {
         try {
             final String[] keys = prefs.keys();
             Arrays.sort(keys);
-            return Iterables.transform(Arrays.asList(keys), new Function<String, PrefResource>() {
-                @Override
-                public PrefResource apply(String key) {
-                    return new PrefResource(realm, prefs, key, false);
-                }
-            });
+            return Iterables.transform(Arrays.asList(keys), key -> new PrefResource(realm, prefs, key, false));
         } catch (BackingStoreException e) {
             throw Throwables.propagate(e);
         }

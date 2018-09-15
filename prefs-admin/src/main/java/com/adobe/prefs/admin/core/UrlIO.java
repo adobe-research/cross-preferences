@@ -8,20 +8,12 @@ import java.io.UnsupportedEncodingException;
 public enum UrlIO implements Function<String, String> {
     ENCODER {
         @Override public String apply(String input) {
-            try {
-                return input != null ? UriUtils.encodeQueryParam(input, "UTF-8") : null;
-            } catch (UnsupportedEncodingException e) {
-                throw new IllegalStateException("WTF-8");
-            }
+            return input != null ? UriUtils.encodeQueryParam(input, "UTF-8") : null;
         }
     },
     DECODER {
         @Override public String apply(String input) {
-            try {
-                return input != null ? UriUtils.decode(input, "UTF-8") : null;
-            } catch (UnsupportedEncodingException e) {
-                throw new IllegalStateException("WTF-8");
-            }
+            return input != null ? UriUtils.decode(input, "UTF-8") : null;
         }
     }
 }

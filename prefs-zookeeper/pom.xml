@@ -3,7 +3,7 @@
     <parent>
         <groupId>com.adobe.prefs</groupId>
         <artifactId>cross-preferences</artifactId>
-        <version>0.2.0-SNAPSHOT</version>
+        <version>0.2.3-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 

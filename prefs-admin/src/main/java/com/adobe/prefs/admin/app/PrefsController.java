@@ -11,14 +11,13 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletRequest;
@@ -28,15 +27,21 @@ import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.prefs.BackingStoreException;
 import java.util.prefs.InvalidPreferencesFormatException;
 import java.util.prefs.Preferences;
 
-import static org.springframework.http.HttpStatus.*;
+import static org.springframework.http.HttpStatus.BAD_REQUEST;
+import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
+import static org.springframework.http.HttpStatus.NOT_FOUND;
+import static org.springframework.http.HttpStatus.NOT_IMPLEMENTED;
+import static org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE;
 
-@Controller
+@RestController
 @RequestMapping("/**")
 class PrefsController {
 
@@ -59,8 +64,9 @@ class PrefsController {
     }
 
     @RequestMapping(value = "/", method = RequestMethod.GET)
-    String redirect() {
-        return "redirect:" + PreferencesRoot.sys.toString() + '/';
+    @ResponseStatus(HttpStatus.FOUND)
+    void redirect(HttpServletResponse response) {
+        response.setHeader("Location", PreferencesRoot.sys.toString() + '/');
     }
 
     @RequestMapping("/*.*")
@@ -69,7 +75,6 @@ class PrefsController {
 
     @RequestMapping(value = "/", method = RequestMethod.POST,
             consumes = {MediaType.TEXT_XML_VALUE, MediaType.APPLICATION_XML_VALUE})
-    @ResponseBody
     ResponseEntity<Void> importPreferences(InputStream in) throws IOException, InvalidPreferencesFormatException {
         logger.info("Importing preferences from file...");
         Preferences.importPreferences(in);
@@ -79,13 +84,11 @@ class PrefsController {
 
     @RequestMapping(value = "/", method = RequestMethod.POST,
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @ResponseBody
     ResponseEntity<Void> importPreferences(@RequestParam MultipartFile file) throws IOException, InvalidPreferencesFormatException {
         return importPreferences(file.getInputStream());
     }
 
     @RequestMapping(value = "/{root}/**", method = RequestMethod.GET)
-    @ResponseBody
     ResourceSupport getPreference(@PathVariable PreferencesRoot root, HttpServletRequest request) throws BackingStoreException {
         final PrefSpec prefSpec = new PrefSpec(root, request);
         if (!root.prefs.nodeExists(prefSpec.nodePath)) {
@@ -105,7 +108,6 @@ class PrefsController {
 
 
     @RequestMapping(value = "/{root}/**", method = RequestMethod.PUT)
-    @ResponseBody
     ResponseEntity<Void> setPreference(@PathVariable PreferencesRoot root, HttpServletRequest request, @RequestParam(required = false) String value) throws BackingStoreException {
         final PrefSpec prefSpec = new PrefSpec(root, request);
         Preferences prefs = root.prefs.node(prefSpec.nodePath);

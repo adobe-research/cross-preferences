@@ -14,7 +14,7 @@ import org.springframework.web.multipart.support.StandardServletMultipartResolve
 import org.springframework.web.servlet.config.annotation.ContentNegotiationConfigurer;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurerAdapter;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.servlet.mvc.WebContentInterceptor;
 
 import java.util.List;
@@ -24,7 +24,7 @@ import static org.springframework.hateoas.config.EnableHypermediaSupport.Hyperme
 @Configuration
 @EnableWebMvc
 @EnableHypermediaSupport(type = HypermediaType.HAL)
-public class Config extends WebMvcConfigurerAdapter {
+public class Config implements WebMvcConfigurer {
 
     @Override
     public void configureContentNegotiation(ContentNegotiationConfigurer configurer) {
@@ -59,9 +59,6 @@ public class Config extends WebMvcConfigurerAdapter {
     public void addInterceptors(InterceptorRegistry registry) {
         WebContentInterceptor webContentInterceptor = new WebContentInterceptor();
         webContentInterceptor.setCacheSeconds(0);
-        webContentInterceptor.setUseExpiresHeader(true);
-        webContentInterceptor.setUseCacheControlHeader(true);
-        webContentInterceptor.setUseCacheControlNoStore(true);
         registry.addInterceptor(new WebContentInterceptor());
     }
 

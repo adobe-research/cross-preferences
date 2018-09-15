@@ -1,7 +1,7 @@
 package com.adobe.prefs.admin.app;
 
 import com.adobe.prefs.admin.infra.HtmlMessageConverter;
-import org.mockito.internal.matchers.StartsWith;
+import org.hamcrest.core.StringStartsWith;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.http.converter.xml.Jaxb2CollectionHttpMessageConverter;
 import org.springframework.http.converter.xml.Jaxb2RootElementHttpMessageConverter;
@@ -16,9 +16,20 @@ import java.nio.file.Paths;
 
 import static java.lang.ClassLoader.getSystemResourceAsStream;
 import static java.nio.file.Files.readAllBytes;
-import static org.springframework.http.MediaType.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.http.MediaType.APPLICATION_FORM_URLENCODED;
+import static org.springframework.http.MediaType.APPLICATION_JSON;
+import static org.springframework.http.MediaType.APPLICATION_XML;
+import static org.springframework.http.MediaType.APPLICATION_XML_VALUE;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.fileUpload;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.xpath;
 
 public class PrefsControllerTest {
 
@@ -114,7 +125,7 @@ public class PrefsControllerTest {
         mvc.perform(get(p).param("export", "file"))
                 .andExpect(status().is(200))
                 .andExpect(content().contentType(APPLICATION_XML))
-                .andExpect(header().string("Content-Disposition", new StartsWith("attachment;")));
+                .andExpect(header().string("Content-Disposition", new StringStartsWith("attachment;")));
     }
 
 

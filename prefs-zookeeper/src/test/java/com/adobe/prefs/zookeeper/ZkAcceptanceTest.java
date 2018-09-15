@@ -38,7 +38,7 @@ public class ZkAcceptanceTest extends CrossPreferencesAcceptanceTest<ZkPreferenc
     }
 
     @Override
-    protected String getFromBackingStore(Preferences prefs, String key) throws Exception{
+    protected String getFromBackingStore(Preferences prefs, String key) {
         try {
             final byte[] data = curator.getData().forPath(path(prefs, key));
             return data != null ? new String(data, "UTF-8"): null;
@@ -49,7 +49,7 @@ public class ZkAcceptanceTest extends CrossPreferencesAcceptanceTest<ZkPreferenc
 
     @Override
     protected void createInBackingStore(Preferences prefs, String childName) throws Exception {
-        curator.newNamespaceAwareEnsurePath(path(prefs, childName, "k")).ensure(curator.getZookeeperClient());
+        curator.createContainers(path(prefs, childName, "k"));
         curator.delete().forPath(path(prefs, childName, "k"));
     }
 

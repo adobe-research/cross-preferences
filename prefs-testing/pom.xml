@@ -3,7 +3,7 @@
     <parent>
         <artifactId>cross-preferences</artifactId>
         <groupId>com.adobe.prefs</groupId>
-        <version>0.2.0-SNAPSHOT</version>
+        <version>0.2.3-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
@@ -12,11 +12,5 @@
 
     <name>Preferences testing</name>
 
-    <dependencies>
-        <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
-        </dependency>
-    </dependencies>
 
 </project>

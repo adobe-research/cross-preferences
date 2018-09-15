@@ -211,7 +211,7 @@ public abstract class PreferencesAcceptanceTest<F extends PreferencesFactory, P 
     }
 
     @Test(dataProvider = "chroot", groups = {"prefs", "hierarchy", "notifications"},
-            dependsOnGroups = "factory", timeOut = 1000L)
+            dependsOnGroups = "factory", timeOut = 3000L)
     public void shouldTriggerNodeAdded(Preferences prefs) throws Exception {
         final Preferences watched = prefs.node("watched");
         final NodeChangeListener listener = nodeListener(watched);
@@ -229,7 +229,7 @@ public abstract class PreferencesAcceptanceTest<F extends PreferencesFactory, P 
     }
 
     @Test(dataProvider = "chroot", groups = {"prefs", "hierarchy", "notifications"},
-            dependsOnMethods = "shouldTriggerNodeAdded", timeOut = 1000L)
+            dependsOnMethods = "shouldTriggerNodeAdded", timeOut = 3000L)
     public void shouldTriggerNodeRemoved(Preferences prefs) throws Exception {
         final Preferences watched = prefs.node("watched");
         final NodeChangeListener listener = nodeListener(watched);
@@ -259,7 +259,7 @@ public abstract class PreferencesAcceptanceTest<F extends PreferencesFactory, P 
     }
 
     @Test(dataProvider = "chroot", groups = {"prefs", "concurrency"},
-            dependsOnGroups = {"hierarchy", "kv"}, invocationCount = 5, threadPoolSize = 3, timeOut = 3000L)
+            dependsOnGroups = {"hierarchy", "kv"}, invocationCount = 5, threadPoolSize = 3, timeOut = 5000L)
     public void concurrencyTest(Preferences prefs) throws Exception {
 
         final Preferences child = prefs.node(UUID.randomUUID().toString());
