@@ -14,11 +14,11 @@ import static com.adobe.prefs.zookeeper.ZkUtils.namespace;
 /**
  * Class responsible with creating (and destroying on shutdown) a zookeeper client that
  * can (and <b>is recommended to be</b>) shared throughout the application.
- * <p/>
+ * <p>
  * This is because the CuratorFramework instance is supposed to only be instantiated
  * once per application and the preferences mechanism (service loader) requires this
  * instance to be available when the factory class is loaded.
- * <p/>
+ * <p>
  * The reason why this code is factored out of the {@link ZkPreferencesFactory}
  * is to provide this class as the single one in this package which is meant to be called directly by application code,
  * since everything else in this package is just SPI implementation for Preferences.
