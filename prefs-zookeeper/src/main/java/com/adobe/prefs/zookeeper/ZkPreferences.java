@@ -7,7 +7,6 @@ import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.recipes.cache.ChildData;
 import org.apache.curator.framework.recipes.cache.PathChildrenCache;
 import org.apache.curator.framework.recipes.cache.PathChildrenCacheEvent;
-import org.apache.curator.framework.recipes.cache.PathChildrenCacheEvent.Type;
 import org.apache.curator.framework.recipes.cache.PathChildrenCacheListener;
 import org.apache.zookeeper.KeeperException.NoNodeException;
 import org.apache.zookeeper.data.Stat;
@@ -19,18 +18,20 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 import java.util.UUID;
-import java.util.WeakHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.BiConsumer;
 import java.util.prefs.AbstractPreferences;
 import java.util.prefs.BackingStoreException;
+import java.util.prefs.NodeChangeEvent;
+import java.util.prefs.NodeChangeListener;
+import java.util.prefs.PreferenceChangeEvent;
+import java.util.prefs.PreferenceChangeListener;
+import java.util.prefs.Preferences;
 
 import static com.adobe.prefs.zookeeper.ZkUtils.basename;
 import static com.adobe.prefs.zookeeper.ZkUtils.bytes;
 import static com.adobe.prefs.zookeeper.ZkUtils.string;
-import static com.google.common.base.Throwables.propagate;
-import static java.util.Collections.synchronizedMap;
 import static org.apache.curator.utils.ZKPaths.makePath;
 import static org.apache.zookeeper.KeeperException.NotEmptyException;
 
@@ -56,11 +57,8 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
      * <p>Note that a znode can be both a preference key and a child node,
      * if both its value and its children have been modified</p>
      */
-    static final Predicate<Stat> childFilter = new Predicate<Stat>() {
-        @Override public boolean apply(Stat input) {
-            return input != null && input.getCversion() > 0;
-        }
-    };
+    static final Predicate<Stat> childFilter = input ->
+            input != null && input.getCversion() > 0;
 
     /**
      * Decides whether a znode is to be treated as a preference key.
@@ -75,11 +73,8 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
      * This is because the zookeeper console client does not allow creating a node with an empty value,
      * so any node that was created with that client would also appear as a key for as long as that node exists.
      */
-    static final Predicate<Stat> preferenceFilter = new Predicate<Stat>() {
-        @Override public boolean apply(Stat input) {
-            return input != null && (input.getDataLength() > 0 || (input.getVersion() > 0 && input.getCversion() <= 0));
-        }
-    };
+    static final Predicate<Stat> preferenceFilter = input ->
+            input != null && (input.getDataLength() > 0 || (input.getVersion() > 0 && input.getCversion() <= 0));
 
     final CuratorFramework curator;
 
@@ -87,7 +82,8 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
     private final boolean encodedBinary;
 
     private final PathChildrenCache pcc;
-    private final Map<String, String> notificationsToIgnore = synchronizedMap(new WeakHashMap<String, String>());
+    private final List<NodeChangeListener> nodeChangeListeners = new CopyOnWriteArrayList<>();
+    private final List<PreferenceChangeListener> preferenceChangeListeners = new CopyOnWriteArrayList<>();
 
 
     /**
@@ -120,12 +116,17 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
         }
     }
 
+    @Override
+    public ZkPreferences parent() {
+        return (ZkPreferences) super.parent();
+    }
+
     ZkPreferences registerInBackingStore() {
         try {
             flushSpi();
             syncSpi();
         } catch (BackingStoreException e) {
-            propagate(e);
+            throw new IllegalStateException(e);
         }
         return this;
     }
@@ -138,7 +139,6 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
     @Override
     protected void putSpi(String key, String value) {
         logger.trace("Setting key `{}` in {}", key, this);
-        notificationsToIgnore.put(key, value);
         putRawBytes(key, bytes(value));
     }
 
@@ -163,7 +163,6 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
     public void putByteArray(String key, byte[] value) {
         logger.trace("Setting key `{}` as byte array in {}", key, this);
         if (encodedBinary) {
-            notificationsToIgnore.put(key, string(value));
             super.putByteArray(key, value);
         } else {
             putRawBytes(key, value);
@@ -201,7 +200,6 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
     protected void removeSpi(String key) {
         logger.trace("Removing preference key `{}` in {}", key, this);
         try {
-            notificationsToIgnore.put(key, null);
             curator.delete().forPath(path(key));
         } catch (NotEmptyException e) {
             // fallback to setting a null value if the node is also a non-empty child node
@@ -219,6 +217,7 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
         try {
             if (curator.checkExists().forPath(absolutePath()) != null) {
                 curator.delete().deletingChildrenIfNeeded().forPath(absolutePath());
+                parent().triggerChildRemoved(this);
             }
         } catch (NoNodeException e) {
             logger.warn("Attempt to remove a child that does not exist: {}", this);
@@ -337,63 +336,107 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
 
     @Override
     public void childEvent(CuratorFramework curator, PathChildrenCacheEvent event) throws Exception {
-        final ChildData childData = event.getData();
+        try {
+            final ChildData childData = event.getData();
 
-        if (childData == null) {
-            logger.debug("Unhandled zookeeper event: {}", event);
-            return;
-        }
-        logger.debug("Zookeeper event received: {}", event);
-        final String name = childData.getPath() != null ? basename(childData.getPath()) : null;
-        final String value = string(childData.getData());
-        switch(event.getType()) {
-            case CHILD_REMOVED:
-                try {
-                    if (preferenceFilter.apply(childData.getStat()) && !shouldIgnore(event, name, value)) {
-                        remove(name);   // redundant, just for notifying listeners
+            if (childData == null) {
+                logger.debug("Unhandled zookeeper event: {}", event);
+                return;
+            }
+            logger.debug("Zookeeper event received: {}", event);
+            final String name = childData.getPath() != null ? basename(childData.getPath()) : null;
+            final String value = string(childData.getData());
+            switch (event.getType()) {
+                case CHILD_REMOVED:
+                    try {
+                        if (preferenceFilter.apply(childData.getStat())) {
+                            triggerPreferenceDropped(name);
+                        }
+                    } catch (IllegalStateException e) {
+                        logger.debug("Could not remove preference key `{}` from {}: {}", name, this, e.toString());
                     }
-                } catch (IllegalStateException e) {
-                    logger.debug("Could not remove preference key `{}` from {}: {}", name, this, e.toString());
-                }
-                try {
-                    if (nodeExists(name)) {
-                        node(name).removeNode();    // remove node from local cache and notify listeners
+                    try {
+                        if (nodeExists(name)) {
+                            final Preferences child = node(name);
+                            child.removeNode();    // remove node from local cache and notify listeners
+                            triggerChildRemoved(child);
+                        }
+                    } catch (IllegalStateException e) {
+                        logger.debug("Node `{}` already removed from {}: {}", name, this, e.toString());
                     }
-                } catch (IllegalStateException e) {
-                    logger.debug("Node `{}` already removed from {}: {}", name, this, e.toString());
-                }
-                break;
-            case CHILD_ADDED:
-                // read the fresh stat for this znode to make sure we won't rely on stale values
-                final Stat currentStat = curator.checkExists().forPath(path(name));
-                if (childFilter.apply(currentStat)) {
-                    node(name);
-                }
-                if (preferenceFilter.apply(currentStat) && !shouldIgnore(event, name, value)) {
-                    put(name, value);
-                }
-                break;
-            case CHILD_UPDATED:
-                if (!shouldIgnore(event, name, value)) {
-                    put(name, value);
-                }
-                break;
-            default:
-                logger.debug("Ignoring zookeeper event: {}", event);
+                    break;
+                case CHILD_ADDED:
+                    // read the fresh stat for this znode to make sure we won't rely on stale values
+                    final Stat currentStat = curator.checkExists().forPath(path(name));
+                    if (childFilter.apply(currentStat)) {
+                        triggerChildAdded(name);
+                    }
+                    if (preferenceFilter.apply(currentStat)) {
+                        triggerPreferenceChange(name, value);
+                    }
+                    break;
+                case CHILD_UPDATED:
+                    triggerPreferenceChange(name, value);
+                    break;
+                default:
+                    logger.debug("Ignoring zookeeper event: {}", event);
+            }
+        } catch (Exception e) {
+            logger.error("Error handling event `" + event + "` in path: " + absolutePath(), e);
         }
     }
 
-    private boolean shouldIgnore(PathChildrenCacheEvent event, String key, String value) {
-        if (event.getType() == Type.CHILD_REMOVED) {
-            value = null;
-        }
-        return notificationsToIgnore.containsKey(key)
-                && Objects.equals(notificationsToIgnore.remove(key), value);
-    }
 
     byte[] getCurrentValue(String path) {
         final ChildData child = pcc.getCurrentData(path);
         return child != null ? child.getData() : null;
+    }
+
+    @Override
+    public void addPreferenceChangeListener(PreferenceChangeListener pcl) {
+        preferenceChangeListeners.add(pcl);
+    }
+
+    @Override
+    public void removePreferenceChangeListener(PreferenceChangeListener pcl) {
+        preferenceChangeListeners.remove(pcl);
+    }
+
+    @Override
+    public void addNodeChangeListener(NodeChangeListener ncl) {
+        nodeChangeListeners.add(ncl);
+    }
+
+    @Override
+    public void removeNodeChangeListener(NodeChangeListener ncl) {
+        nodeChangeListeners.remove(ncl);
+    }
+
+    private <L, E> void triggerEvent(List<L> listeners, BiConsumer<L, E> handler, E event) {
+        listeners.parallelStream().forEach(listener -> {
+            try {
+                handler.accept(listener, event);
+            } catch (Exception e) {
+                logger.error("Could not notify listener `" + listener + "` of event `" + event
+                        + "` in path:  " + absolutePath(), e);
+            }
+        });
+    }
+
+    private void triggerChildAdded(String childName) {
+        triggerEvent(nodeChangeListeners, NodeChangeListener::childAdded, new NodeChangeEvent(this, node(childName)));
+    }
+
+    private void triggerChildRemoved(Preferences child) {
+        triggerEvent(nodeChangeListeners, NodeChangeListener::childRemoved, new NodeChangeEvent(this, child));
+    }
+
+    private void triggerPreferenceChange(String key, String value) {
+        triggerEvent(preferenceChangeListeners, PreferenceChangeListener::preferenceChange, new PreferenceChangeEvent(this, key, value));
+    }
+
+    private void triggerPreferenceDropped(String key) {
+        triggerPreferenceChange(key, null);
     }
 
 }
