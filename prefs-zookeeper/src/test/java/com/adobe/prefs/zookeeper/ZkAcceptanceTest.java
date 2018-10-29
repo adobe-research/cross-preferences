@@ -17,7 +17,7 @@ public class ZkAcceptanceTest extends CrossPreferencesAcceptanceTest<ZkPreferenc
     private CuratorFramework curator;
     
     public ZkAcceptanceTest() {
-        super(100);
+        super(300);
     }
 
     @BeforeTest
@@ -66,7 +66,7 @@ public class ZkAcceptanceTest extends CrossPreferencesAcceptanceTest<ZkPreferenc
     @Override
     protected boolean childExistsInBackingStore(Preferences prefs, String childName) throws Exception {
         final Stat stat = curator.checkExists().forPath(path(prefs, childName));
-        return ZkPreferences.childFilter.apply(stat);
+        return ZkPreferences.isContainerNode(stat);
     }
 
     String namespace(Preferences prefs) {

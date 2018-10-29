@@ -40,41 +40,16 @@ import static org.apache.zookeeper.KeeperException.NotEmptyException;
  *
  * The main challenge is to maintain the clear distinction between <em>preferences</em>
  * (file-like entries or keys) and <em>children</em> (directory-like entries),
- * since the ZooKeeper nodes are designed to work as both.
+ * since the ZooKeeper nodes are designed to work as both and the Preferences API also allows the same name
+ * to be used for a child and a preference key of the same node.
  *
- * The actual heuristic is encapsulated in the {@link #childFilter} and {@link #preferenceFilter} predicates.
+ * The actual heuristic is encapsulated in the {@link #isContainerNode(Stat)} and {@link #isValueNode(Stat)} predicates
  *
  * However, both false positives and negatives are still possible.
  *
  */
 class ZkPreferences extends AbstractPreferences implements PathChildrenCacheListener, Closeable {
     private static final Logger logger = LoggerFactory.getLogger(ZkPreferences.class);
-
-    /**
-     * Decides whether a znode is to be treated as a child node.
-     * A child node is treated as such when its `cversion` is greater than 0
-     * (which means it is -- or used to be -- a container for other nodes).
-     * <p>Note that a znode can be both a preference key and a child node,
-     * if both its value and its children have been modified</p>
-     */
-    static final Predicate<Stat> childFilter = input ->
-            input != null && input.getCversion() > 0;
-
-    /**
-     * Decides whether a znode is to be treated as a preference key.
-     * <p>It will return true if either of the following is true:<ul>
-     *     <li>the node has never had any children (cversion == 0)</li>
-     *     <li>the node has a non-empty value</li>
-     * </ul></p>
-     *
-     * If the node has an empty value, but it has a both `cversion` and `version` values greater than 0,
-     * it will only show as a child node and not a key (although it is obvious that it used to be a "key",
-     * not only a "node").<br/>
-     * This is because the zookeeper console client does not allow creating a node with an empty value,
-     * so any node that was created with that client would also appear as a key for as long as that node exists.
-     */
-    static final Predicate<Stat> preferenceFilter = input ->
-            input != null && (input.getDataLength() > 0 || (input.getVersion() > 0 && input.getCversion() <= 0));
 
     final CuratorFramework curator;
 
@@ -120,6 +95,45 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
     public ZkPreferences parent() {
         return (ZkPreferences) super.parent();
     }
+
+    /**
+     * Decides whether a znode is to be treated as a child node.
+     * A child node is treated as such when its `cversion` is greater than 0
+     * (which means it is -- or used to be -- a container for other nodes).
+     * When it has no children, we will <i>assume</i> it's meant to be a child node if it doesn't
+     * (and never used to) contain any data.
+     *
+     * <p>Note that a znode can be both a preference key and a child node,
+     * if both its value and its children have been modified</p>
+     */
+    static boolean isContainerNode(Stat stat) {
+        if (stat == null) {
+            return false;
+        }
+        return stat.getCversion() > 0 || (stat.getVersion() == 0 && stat.getDataLength() == 0);
+    }
+
+    /**
+     * Decides whether a znode is to be treated as a preference key.
+     * <p>It will return true if either of the following is true:<ul>
+     *     <li>the node has a non-empty value</li>
+     *     <li>the node has never had any children (cversion == 0)</li>
+     * </ul></p>
+     *
+     * If the node has an empty value, but it has a both `cversion` and `version` values greater than 0,
+     * it will only show as a child node and not a key (although it is obvious that it used to be a "key",
+     * not only a "node").<br/>
+     * This is because the zookeeper console client does not allow creating a node with an empty value,
+     * so any node that was created with that client would also appear as a key for as long as that node exists.
+     */
+    static boolean isValueNode(Stat stat) {
+        if (stat == null) {
+            return false;
+        }
+        return stat.getDataLength() > 0 || stat.getVersion() > 0;
+    }
+
+
 
     ZkPreferences registerInBackingStore() {
         try {
@@ -235,13 +249,13 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
     @Override
     protected String[] keysSpi() throws BackingStoreException {
         logger.trace("Getting preference keys of {}", this);
-        return getChildren(preferenceFilter);
+        return getChildren(ZkPreferences::isValueNode);
     }
 
     @Override
     protected String[] childrenNamesSpi() throws BackingStoreException {
         logger.trace("Getting children of {}", this);
-        return getChildren(childFilter);
+        return getChildren(ZkPreferences::isContainerNode);
     }
 
 
@@ -297,16 +311,16 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
         logger.debug("Flushing preference node {}", this);
         try {
             final Stat pathStat = curator.checkExists().forPath(absolutePath());
-            if (!childFilter.apply(pathStat)) {
+            if (!isContainerNode(pathStat)) {
                 // force the `cversion` to increment by adding and removing a random key
                 final String randomKey = UUID.randomUUID().toString();
                 logger.debug("Creating a random key `{}` to mark path as node by increasing the 'cversion': {}",
                         randomKey, absolutePath());
                 final String randomPath = path(randomKey);
-                curator.newNamespaceAwareEnsurePath(randomPath).ensure(curator.getZookeeperClient());
+                curator.createContainers(randomPath);
                 curator.delete().forPath(randomPath);
             }
-            assert childFilter.apply(curator.checkExists().forPath(absolutePath())) :
+            assert isContainerNode(curator.checkExists().forPath(absolutePath())) :
                     "node not marked as child node: " + absolutePath();
             logger.info("Created zookeeper node for {}", this);
         } catch (Exception e) {
@@ -342,7 +356,7 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
         try {
             final ChildData childData = event.getData();
 
-            if (childData == null) {
+            if (childData == null || childData.getStat() == null) {
                 logger.debug("Unhandled zookeeper event: {}", event);
                 return;
             }
@@ -352,7 +366,7 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
             switch (event.getType()) {
                 case CHILD_REMOVED:
                     try {
-                        if (preferenceFilter.apply(childData.getStat())) {
+                        if (isValueNode(childData.getStat())) {
                             triggerPreferenceDropped(name);
                         }
                     } catch (IllegalStateException e) {
@@ -369,12 +383,10 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
                     }
                     break;
                 case CHILD_ADDED:
-                    // read the fresh stat for this znode to make sure we won't rely on stale values
-                    final Stat currentStat = curator.checkExists().forPath(path(name));
-                    if (childFilter.apply(currentStat)) {
+                    if (isContainerNode(childData.getStat())) {
                         triggerChildAdded(name);
                     }
-                    if (preferenceFilter.apply(currentStat)) {
+                    if (isValueNode(childData.getStat())) {
                         triggerPreferenceChange(name, value);
                     }
                     break;

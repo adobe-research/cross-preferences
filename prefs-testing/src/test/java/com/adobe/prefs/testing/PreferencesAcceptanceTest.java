@@ -259,7 +259,7 @@ public abstract class PreferencesAcceptanceTest<F extends PreferencesFactory, P 
     }
 
     @Test(dataProvider = "chroot", groups = {"prefs", "concurrency"},
-            dependsOnGroups = {"hierarchy", "kv"}, invocationCount = 5, threadPoolSize = 3, timeOut = 5000L)
+            dependsOnGroups = {"hierarchy", "kv"}, invocationCount = 12, threadPoolSize = 4, timeOut = 10000L)
     public void concurrencyTest(Preferences prefs) throws Exception {
 
         final Preferences child = prefs.node(UUID.randomUUID().toString());
@@ -270,9 +270,8 @@ public abstract class PreferencesAcceptanceTest<F extends PreferencesFactory, P 
 
         prefs.putInt(key, 12);
         final Preferences grandson = child.node("grandson");
-        ScheduledFuture<?> nodeAdded = testNodeAdded(nodeListener, child, grandson.name(), 1);
-
         child.putBoolean(key, true);
+        ScheduledFuture<?> nodeAdded = testNodeAdded(nodeListener, child, grandson.name(), 1);
         ScheduledFuture<?> prefSet = testPrefChange(prefListener, child, key, "true", 1);
         assertEquals(prefs.getInt(key, 0), 12);
         assertTrue(child.getBoolean(key, false));
