@@ -329,6 +329,9 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
                     logger.error("Failed to close child node: {}", child);
                 }
             }
+            logger.info("Cleaning up node and preference listeners for {}", absolutePath());
+            nodeChangeListeners.clear();
+            preferenceChangeListeners.clear();
             logger.info("Closing the Zookeeper listener for {}", this);
             pcc.close();
         }
@@ -395,26 +398,31 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
     @Override
     public void addPreferenceChangeListener(PreferenceChangeListener pcl) {
         preferenceChangeListeners.add(pcl);
+        logger.info("Preference change listener added: {}", pcl);
     }
 
     @Override
     public void removePreferenceChangeListener(PreferenceChangeListener pcl) {
         preferenceChangeListeners.remove(pcl);
+        logger.info("Preference change listener removed: {}", pcl);
     }
 
     @Override
     public void addNodeChangeListener(NodeChangeListener ncl) {
         nodeChangeListeners.add(ncl);
+        logger.info("Node change listener added: {}", ncl);
     }
 
     @Override
     public void removeNodeChangeListener(NodeChangeListener ncl) {
         nodeChangeListeners.remove(ncl);
+        logger.info("Node change listener removed: {}", ncl);
     }
 
     private <L, E> void triggerEvent(List<L> listeners, BiConsumer<L, E> handler, E event) {
         listeners.parallelStream().forEach(listener -> {
             try {
+                logger.trace("Notifying listener `{}` of event `{}` in path: `{}`", listener, event, absolutePath());
                 handler.accept(listener, event);
             } catch (Exception e) {
                 logger.error("Could not notify listener `" + listener + "` of event `" + event
@@ -424,14 +432,20 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
     }
 
     private void triggerChildAdded(String childName) {
+        logger.debug("Notifying {} node listeners that child `{}` was added under `{}`",
+                nodeChangeListeners.size(), childName, absolutePath());
         triggerEvent(nodeChangeListeners, NodeChangeListener::childAdded, new NodeChangeEvent(this, node(childName)));
     }
 
     private void triggerChildRemoved(Preferences child) {
+        logger.debug("Notifying {} node listeners that child `{}` was removed from `{}`",
+                nodeChangeListeners.size(), child.name(), absolutePath());
         triggerEvent(nodeChangeListeners, NodeChangeListener::childRemoved, new NodeChangeEvent(this, child));
     }
 
     private void triggerPreferenceChange(String key, String value) {
+        logger.debug("Notifying {} preference listeners that preference `{}` is now `{}` under `{}`",
+                preferenceChangeListeners.size(), key, value, absolutePath());
         triggerEvent(preferenceChangeListeners, PreferenceChangeListener::preferenceChange, new PreferenceChangeEvent(this, key, value));
     }
 
