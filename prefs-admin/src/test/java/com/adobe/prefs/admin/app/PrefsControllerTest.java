@@ -16,20 +16,9 @@ import java.nio.file.Paths;
 
 import static java.lang.ClassLoader.getSystemResourceAsStream;
 import static java.nio.file.Files.readAllBytes;
-import static org.springframework.http.MediaType.APPLICATION_FORM_URLENCODED;
-import static org.springframework.http.MediaType.APPLICATION_JSON;
-import static org.springframework.http.MediaType.APPLICATION_XML;
-import static org.springframework.http.MediaType.APPLICATION_XML_VALUE;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.fileUpload;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.xpath;
+import static org.springframework.http.MediaType.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 public class PrefsControllerTest {
 
@@ -83,6 +72,15 @@ public class PrefsControllerTest {
         mvc.perform(put(path).contentType(APPLICATION_FORM_URLENCODED).param("value", "val"))
                 .andExpect(status().is(303))
                 .andExpect(header().string("Location", p + child));
+    }
+
+    @Test(dataProvider = "prefs")
+    public void shouldNotAllowEmptyValues(String p) throws  Exception {
+        final String path = p + child + key;
+        mvc.perform(put(path).contentType(APPLICATION_FORM_URLENCODED).param("value", ""))
+                .andExpect(status().is(400));
+        mvc.perform(put(path).contentType(APPLICATION_FORM_URLENCODED))
+                .andExpect(status().is(400));
     }
 
     @Test(dataProvider = "prefs", dependsOnMethods = "shouldCreateKey")

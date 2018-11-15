@@ -108,11 +108,11 @@ class PrefsController {
 
 
     @RequestMapping(value = "/{root}/**", method = RequestMethod.PUT)
-    ResponseEntity<Void> setPreference(@PathVariable PreferencesRoot root, HttpServletRequest request, @RequestParam(required = false) String value) throws BackingStoreException {
+    ResponseEntity<Void> setPreference(@PathVariable PreferencesRoot root, HttpServletRequest request, @RequestParam(required = false) String value) {
         final PrefSpec prefSpec = new PrefSpec(root, request);
         Preferences prefs = root.prefs.node(prefSpec.nodePath);
         if (prefSpec.key != null) {
-            if (value == null) {
+            if (value == null || value.isEmpty()) {
                 throw new NoValueException(prefSpec.key);
             }
             try {
