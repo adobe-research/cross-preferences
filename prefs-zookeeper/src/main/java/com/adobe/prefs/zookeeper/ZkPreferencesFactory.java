@@ -1,9 +1,7 @@
 package com.adobe.prefs.zookeeper;
 
-import com.google.common.base.Function;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
-import org.apache.curator.framework.CuratorFramework;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,12 +30,8 @@ public class ZkPreferencesFactory implements PreferencesFactory {
     }
 
     private Supplier<ZkPreferences> prefsSupplier(String path, final boolean encodedBinary, final boolean userNode) {
-        return Suppliers.compose(new Function<CuratorFramework, ZkPreferences>() {
-            @Override public ZkPreferences apply(final CuratorFramework curator) {
-                final ZkPreferences prefs = new ZkPreferences(curator, encodedBinary, userNode);
-                return prefs.registerInBackingStore();
-            }
-        }, ZkManager.curatorFacadeSupplier(path));
+        return Suppliers.compose(curator -> new ZkPreferences(curator, encodedBinary, userNode),
+                ZkManager.curatorFacadeSupplier(path));
     }
 
     @Override

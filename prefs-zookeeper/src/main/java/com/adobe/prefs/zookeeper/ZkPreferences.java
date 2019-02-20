@@ -16,10 +16,11 @@ import org.slf4j.LoggerFactory;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.prefs.AbstractPreferences;
 import java.util.prefs.BackingStoreException;
@@ -50,6 +51,7 @@ import static org.apache.zookeeper.KeeperException.NotEmptyException;
  */
 class ZkPreferences extends AbstractPreferences implements PathChildrenCacheListener, Closeable {
     private static final Logger logger = LoggerFactory.getLogger(ZkPreferences.class);
+    private static final String CHILD_MARKER = "_PrefX_0ca1b97f-1a85-4e28-a692-dd8242b15cbe";
 
     final CuratorFramework curator;
 
@@ -57,8 +59,8 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
     private final boolean encodedBinary;
 
     private final PathChildrenCache pcc;
-    private final List<NodeChangeListener> nodeChangeListeners = new CopyOnWriteArrayList<>();
-    private final List<PreferenceChangeListener> preferenceChangeListeners = new CopyOnWriteArrayList<>();
+    private final Set<NodeChangeListener> nodeChangeListeners = ConcurrentHashMap.newKeySet();
+    private final Set<PreferenceChangeListener> preferenceChangeListeners = ConcurrentHashMap.newKeySet();
 
 
     /**
@@ -88,6 +90,11 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
         newNode = true;
         if (parent != null) {
             logger.debug("Zookeeper preference node `{}` created as a child of {}", name, parent);
+        }
+        try {
+            flush();
+        } catch (BackingStoreException e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -134,17 +141,6 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
     }
 
 
-
-    ZkPreferences registerInBackingStore() {
-        try {
-            flushSpi();
-            syncSpi();
-        } catch (BackingStoreException e) {
-            throw new IllegalStateException(e);
-        }
-        return this;
-    }
-
     String path(String child) {
         Preconditions.checkArgument(!Strings.isNullOrEmpty(child), "Empty child");
         return makePath(absolutePath(), child);
@@ -162,7 +158,7 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
             if (curator.checkExists().forPath(path) == null) {
                 curator.create().forPath(path, bytes);
             } else {
-                if (! Arrays.equals(bytes, getCurrentValue(path)) ) {
+                if (! Arrays.equals(bytes, curator.getData().forPath(path)) ) {
                     curator.setData().forPath(path, bytes);
                 }
             }
@@ -238,22 +234,21 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
         } catch (Exception e) {
             throw new BackingStoreException(e);
         } finally {
-            try {
-                close();
-            } catch (IOException e) {
-                logger.error("Error closing listener", e);
-            }
+            logger.info("Cleaning up node and preference listeners for {}", absolutePath());
+            nodeChangeListeners.clear();
+            preferenceChangeListeners.clear();
+            stopWatching();
         }
     }
 
     @Override
-    protected String[] keysSpi() throws BackingStoreException {
+    protected String[] keysSpi() {
         logger.trace("Getting preference keys of {}", this);
         return getChildren(ZkPreferences::isValueNode);
     }
 
     @Override
-    protected String[] childrenNamesSpi() throws BackingStoreException {
+    protected String[] childrenNamesSpi() {
         logger.trace("Getting children of {}", this);
         return getChildren(ZkPreferences::isContainerNode);
     }
@@ -263,7 +258,7 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
      * Lists only the child zookeeper nodes that comply to the provided filter (which should include
      * either "directories" or "files").
      */
-    protected String[] getChildren(Predicate<Stat> filter) throws BackingStoreException {
+    protected String[] getChildren(Predicate<Stat> filter) {
         try {
             final List<String> children = curator.getChildren().forPath(absolutePath());
             // list as keys only the child nodes with no children of their own
@@ -283,12 +278,15 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
     @Override
     protected AbstractPreferences childSpi(String name) {
         logger.trace("Getting child `{}` of {}", name, this);
-        final ZkPreferences child = new ZkPreferences(curator, this, name, encodedBinary, userNode);
-        return child.registerInBackingStore();
+        return new ZkPreferences(curator, this, name, encodedBinary, userNode);
     }
 
     @Override
-    protected void syncSpi() throws BackingStoreException {
+    protected void syncSpi() {
+        // NOOP
+    }
+
+    private void startWatching() {
         logger.debug("Syncing preference node {}", this);
         try {
             pcc.start();
@@ -299,10 +297,19 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
             try {
                 pcc.rebuild();
             } catch (Exception e) {
-                throw new BackingStoreException(e);
+                throw new IllegalStateException("Failed to rebuild cache", e);
             }
         } catch (Exception e) {
-            throw new BackingStoreException(e);
+            throw new IllegalStateException("Failed to start cache", e);
+        }
+    }
+
+    private void stopWatching() {
+        logger.info("Closing the Zookeeper listener for {}", this);
+        try {
+            pcc.close();
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
         }
     }
 
@@ -311,14 +318,13 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
         logger.debug("Flushing preference node {}", this);
         try {
             final Stat pathStat = curator.checkExists().forPath(absolutePath());
-            if (!isContainerNode(pathStat)) {
+            if (!isContainerNode(pathStat) && !CHILD_MARKER.equals(name())) {
                 // force the `cversion` to increment by adding and removing a random key
-                final String randomKey = UUID.randomUUID().toString();
-                logger.debug("Creating a random key `{}` to mark path as node by increasing the 'cversion': {}",
-                        randomKey, absolutePath());
-                final String randomPath = path(randomKey);
-                curator.createContainers(randomPath);
-                curator.delete().forPath(randomPath);
+                logger.debug("Creating a synthetic child `{}` to mark path as node by increasing the 'cversion': {}",
+                        CHILD_MARKER, absolutePath());
+                final String markerPath = path(CHILD_MARKER);
+                curator.create().creatingParentsIfNeeded().forPath(markerPath, CHILD_MARKER.getBytes());
+                curator.delete().forPath(markerPath);
             }
             assert isContainerNode(curator.checkExists().forPath(absolutePath())) :
                     "node not marked as child node: " + absolutePath();
@@ -334,7 +340,7 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
     }
 
     @Override
-    public void close() throws IOException {
+    public void close() {
         synchronized (lock) {
             for (AbstractPreferences child : cachedChildren()) {
                 try {
@@ -346,13 +352,12 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
             logger.info("Cleaning up node and preference listeners for {}", absolutePath());
             nodeChangeListeners.clear();
             preferenceChangeListeners.clear();
-            logger.info("Closing the Zookeeper listener for {}", this);
-            pcc.close();
+            stopWatching();
         }
     }
 
     @Override
-    public void childEvent(CuratorFramework curator, PathChildrenCacheEvent event) throws Exception {
+    public void childEvent(CuratorFramework curator, PathChildrenCacheEvent event) {
         try {
             final ChildData childData = event.getData();
 
@@ -362,6 +367,12 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
             }
             logger.debug("Zookeeper event received: {}", event);
             final String name = childData.getPath() != null ? basename(childData.getPath()) : null;
+
+            if (CHILD_MARKER.equals(name)) {
+                logger.trace("Ignoring events for child marker: {}", CHILD_MARKER);
+                return;
+            }
+
             final String value = string(childData.getData());
             switch (event.getType()) {
                 case CHILD_REMOVED:
@@ -402,62 +413,70 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
     }
 
 
-    byte[] getCurrentValue(String path) {
-        final ChildData child = pcc.getCurrentData(path);
-        return child != null ? child.getData() : null;
+    private void alterListeners(Runnable action) {
+        synchronized (lock) {
+            final int beforeCount = preferenceChangeListeners.size() + nodeChangeListeners.size();
+            action.run();
+            final int afterCount = preferenceChangeListeners.size() + nodeChangeListeners.size();
+            if (beforeCount == 0 && afterCount > 0) {
+                startWatching();
+            } else if (afterCount == 0 && beforeCount > 0) {
+                stopWatching();
+            }
+        }
     }
 
     @Override
     public void addPreferenceChangeListener(PreferenceChangeListener pcl) {
-        preferenceChangeListeners.add(pcl);
+        alterListeners(() -> preferenceChangeListeners.add(pcl));
         logger.info("Preference change listener added: {}", pcl);
     }
 
     @Override
     public void removePreferenceChangeListener(PreferenceChangeListener pcl) {
-        preferenceChangeListeners.remove(pcl);
+        alterListeners(() -> preferenceChangeListeners.remove(pcl));
         logger.info("Preference change listener removed: {}", pcl);
     }
 
     @Override
     public void addNodeChangeListener(NodeChangeListener ncl) {
-        nodeChangeListeners.add(ncl);
+        alterListeners(() -> nodeChangeListeners.add(ncl));
         logger.info("Node change listener added: {}", ncl);
     }
 
     @Override
     public void removeNodeChangeListener(NodeChangeListener ncl) {
-        nodeChangeListeners.remove(ncl);
+        alterListeners(() -> nodeChangeListeners.remove(ncl));
         logger.info("Node change listener removed: {}", ncl);
     }
 
-    private <L, E> void triggerEvent(List<L> listeners, BiConsumer<L, E> handler, E event) {
+    private <L, E> void triggerEvent(Collection<L> listeners, BiConsumer<L, E> handler, E event) {
         listeners.parallelStream().forEach(listener -> {
             try {
-                logger.trace("Notifying listener `{}` of event `{}` in path: `{}`", listener, event, absolutePath());
+                logger.trace("Notifying listener `{}` of event `{}` in: `{}`", listener, event, this);
                 handler.accept(listener, event);
             } catch (Exception e) {
                 logger.error("Could not notify listener `" + listener + "` of event `" + event
-                        + "` in path:  " + absolutePath(), e);
+                        + "` in:  " + this, e);
             }
         });
     }
 
     private void triggerChildAdded(String childName) {
         logger.debug("Notifying {} node listeners that child `{}` was added under `{}`",
-                nodeChangeListeners.size(), childName, absolutePath());
+                nodeChangeListeners.size(), childName, this);
         triggerEvent(nodeChangeListeners, NodeChangeListener::childAdded, new NodeChangeEvent(this, node(childName)));
     }
 
     private void triggerChildRemoved(Preferences child) {
         logger.debug("Notifying {} node listeners that child `{}` was removed from `{}`",
-                nodeChangeListeners.size(), child.name(), absolutePath());
+                nodeChangeListeners.size(), child.name(), this);
         triggerEvent(nodeChangeListeners, NodeChangeListener::childRemoved, new NodeChangeEvent(this, child));
     }
 
     private void triggerPreferenceChange(String key, String value) {
         logger.debug("Notifying {} preference listeners that preference `{}` is now `{}` under `{}`",
-                preferenceChangeListeners.size(), key, value, absolutePath());
+                preferenceChangeListeners.size(), key, value, this);
         triggerEvent(preferenceChangeListeners, PreferenceChangeListener::preferenceChange, new PreferenceChangeEvent(this, key, value));
     }
 
