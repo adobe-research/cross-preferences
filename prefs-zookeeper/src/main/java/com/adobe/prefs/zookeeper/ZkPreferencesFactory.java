@@ -1,7 +1,5 @@
 package com.adobe.prefs.zookeeper;
 
-import com.google.common.base.Supplier;
-import com.google.common.base.Suppliers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,8 +12,8 @@ import java.util.prefs.PreferencesFactory;
 public class ZkPreferencesFactory implements PreferencesFactory {
     private static final Logger logger = LoggerFactory.getLogger(ZkPreferencesFactory.class);
 
-    private final Supplier<ZkPreferences> userRootSupplier;
-    private final Supplier<ZkPreferences> systemRootSupplier;
+    private final ZkPreferences userRoot;
+    private final ZkPreferences systemRoot;
 
     public ZkPreferencesFactory() {
         this(systemRootPath(), userRootPath());
@@ -25,23 +23,18 @@ public class ZkPreferencesFactory implements PreferencesFactory {
         final boolean encodedBinary = Boolean.parseBoolean(System.getProperty("prefs.zk.binary.base64_encoded", "true"));
         logger.info("Zookeeper prefs factory initialized with system root: {} and user root: {}",
                 systemRootPath, userRootPath);
-        userRootSupplier = Suppliers.memoize(prefsSupplier(userRootPath, encodedBinary, true));
-        systemRootSupplier = Suppliers.memoize(prefsSupplier(systemRootPath, encodedBinary, false));
-    }
-
-    private Supplier<ZkPreferences> prefsSupplier(String path, final boolean encodedBinary, final boolean userNode) {
-        return Suppliers.compose(curator -> new ZkPreferences(curator, encodedBinary, userNode),
-                ZkManager.curatorFacadeSupplier(path));
+        userRoot = new ZkPreferences(ZkManager.curatorFacade(userRootPath), encodedBinary, true);
+        systemRoot = new ZkPreferences(ZkManager.curatorFacade(systemRootPath), encodedBinary, false);
     }
 
     @Override
     public ZkPreferences systemRoot() {
-        return systemRootSupplier.get();
+        return systemRoot;
     }
 
     @Override
     public ZkPreferences userRoot() {
-        return userRootSupplier.get();
+        return userRoot;
     }
 
     static String systemRootPath() {

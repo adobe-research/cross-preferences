@@ -1,8 +1,5 @@
 package com.adobe.prefs.zookeeper;
 
-import com.google.common.base.Function;
-import com.google.common.base.Supplier;
-import com.google.common.base.Suppliers;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.retry.BoundedExponentialBackoffRetry;
@@ -29,9 +26,7 @@ public final class ZkManager {
 
     private static final Logger logger = LoggerFactory.getLogger(ZkManager.class);
 
-    private static final Supplier<CuratorFramework> curatorSupplier = Suppliers.memoize(curatorSupplier());
-
-    private static final Supplier<CuratorFramework> rootFacadeSupplier = Suppliers.memoize(curatorFacadeSupplier("/"));
+    private static volatile CuratorFramework curatorFramework;
 
     /**
      * Shares the Zookeeper client used by the Preferences integration with the application code.
@@ -41,25 +36,10 @@ public final class ZkManager {
      * @return a singleton curator framework instance
      */
     public static CuratorFramework curatorFramework() {
-        return rootFacadeSupplier.get();
-    }
-
-    static Supplier<CuratorFramework> curatorFacadeSupplier(final String rootPath) {
-
-        return Suppliers.compose(new Function<CuratorFramework, CuratorFramework>() {
-            final String namespace = namespace(rootPath);
-
-            @Override
-            public CuratorFramework apply(final CuratorFramework curator) {
-                return curator.usingNamespace(namespace);
-            }
-        }, curatorSupplier);
-    }
-
-
-    private static Supplier<CuratorFramework> curatorSupplier() {
-        return new Supplier<CuratorFramework>() {
-            @Override public CuratorFramework get() {
+        if (curatorFramework != null) {
+            return curatorFramework;
+        } else synchronized (ZkManager.class) {
+            if (curatorFramework == null) {
                 final String quorum = System.getProperty("zk.quorum", "localhost");
                 final int sessionTimeout = Integer.parseInt(
                         System.getProperty("zk.session.timeout", "30000"));
@@ -77,20 +57,22 @@ public final class ZkManager {
 
                 final CuratorFramework curator = CuratorFrameworkFactory.newClient(quorum, sessionTimeout, connectionTimeout,
                         new BoundedExponentialBackoffRetry(initialDelay, maxDelay, maxCount));
-
                 curator.start();
+                Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                    logger.info("Shutting down the Zookeeper client...");
+                    curator.close();
+                }));
 
-                Runtime.getRuntime().addShutdownHook(new Thread() {
-                    @Override
-                    public void run() {
-                        logger.info("Shutting down the Zookeeper client...");
-                        curator.close();
-                    }
-                });
+                curatorFramework = curator.usingNamespace(namespace("/"));
 
-                return curator;
             }
-        };
+            return curatorFramework;
+        }
+
+    }
+
+    static CuratorFramework curatorFacade(final String rootPath) {
+        return curatorFramework().usingNamespace(namespace(rootPath));
     }
 
 }
