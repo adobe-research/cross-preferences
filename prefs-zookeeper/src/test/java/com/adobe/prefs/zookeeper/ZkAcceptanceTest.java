@@ -17,7 +17,7 @@ public class ZkAcceptanceTest extends CrossPreferencesAcceptanceTest<ZkPreferenc
     private CuratorFramework curator;
     
     public ZkAcceptanceTest() {
-        super(300);
+        super(500);
     }
 
     @BeforeTest

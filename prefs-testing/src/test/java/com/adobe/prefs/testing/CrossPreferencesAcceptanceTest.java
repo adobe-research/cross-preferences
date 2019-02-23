@@ -44,7 +44,7 @@ public abstract class CrossPreferencesAcceptanceTest<F extends PreferencesFactor
         createInBackingStore(x, "y");
         assertTrue(childExistsInBackingStore(x, "y"));
 
-        final ScheduledFuture<?> nodeAdded = testNodeAdded(listener, x, "y", 1);
+        final ScheduledFuture<?> nodeAdded = expectNodeAdded(listener, x, "y", 1);
 //        prefs.sync();
         assertTrue(x.nodeExists("y"));
         nodeAdded.get();
@@ -54,10 +54,10 @@ public abstract class CrossPreferencesAcceptanceTest<F extends PreferencesFactor
         removeChildFromBackingStore(x, "y");
         assertFalse(childExistsInBackingStore(x, "y"));
 
-        final ScheduledFuture<?> nodeRemoved = testNodeRemoved(listener, x, "y", 1);
+        final ScheduledFuture<?> nodeRemoved = expectNodeRemoved(listener, x, "y", 1);
 //        prefs.sync();
-        assertFalse(x.nodeExists("y"));
         nodeRemoved.get();
+        assertFalse(x.nodeExists("y"));
 
         x.removeNode();
 //        prefs.flush();
@@ -70,19 +70,19 @@ public abstract class CrossPreferencesAcceptanceTest<F extends PreferencesFactor
 
         final PreferenceChangeListener listener = prefListener(s);
         s.putInt("a", 1);
-        final ScheduledFuture<?> set = testPrefChange(listener, s, "a", "1", 1);
+        final ScheduledFuture<?> set = expectPrefChange(listener, s, "a", "1", 1);
 //        s.flush();
         assertEquals(getFromBackingStore(s, "a"), "1");
         set.get();
 
         putInBackingStore(s, "a", "2");
-        final ScheduledFuture<?> change = testPrefChange(listener, s, "a", "2", 2);
+        final ScheduledFuture<?> change = expectPrefChange(listener, s, "a", "2", 2);
 //        s.sync();
         assertEquals(s.getInt("a", 1), 2);
         change.get();
 
         removeKeyFromBackingStore(s, "a");
-        final ScheduledFuture<?> remove = testPrefChange(listener, s, "a", null, 3);
+        final ScheduledFuture<?> remove = expectPrefChange(listener, s, "a", null, 3);
 //        s.sync();
         assertEquals(s.getInt("a", 0), 0);
         remove.get();

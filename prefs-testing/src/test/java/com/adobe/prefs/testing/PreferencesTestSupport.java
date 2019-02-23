@@ -51,8 +51,8 @@ public abstract class PreferencesTestSupport {
         return scheduler.schedule(task, delay, TimeUnit.MILLISECONDS);
     }
 
-    protected ScheduledFuture<?> testNodeAdded(final NodeChangeListener listener,
-                                               final Preferences parent, final String childName, final int count) {
+    protected ScheduledFuture<?> expectNodeAdded(final NodeChangeListener listener,
+                                                 final Preferences parent, final String childName, final int count) {
         final ArgumentCaptor<NodeChangeEvent> captor = ArgumentCaptor.forClass(NodeChangeEvent.class);
 
         final Runnable task = new Runnable() {
@@ -68,8 +68,8 @@ public abstract class PreferencesTestSupport {
         return schedule(task);
     }
 
-    protected ScheduledFuture<?> testNodeRemoved(final NodeChangeListener listener,
-                                                 final Preferences parent, final String childName, final int count) {
+    protected ScheduledFuture<?> expectNodeRemoved(final NodeChangeListener listener,
+                                                   final Preferences parent, final String childName, final int count) {
         final ArgumentCaptor<NodeChangeEvent> captor = ArgumentCaptor.forClass(NodeChangeEvent.class);
 
         final Runnable task = new Runnable() {
@@ -92,8 +92,8 @@ public abstract class PreferencesTestSupport {
         return listener;
     }
 
-    protected ScheduledFuture<?> testPrefChange(final PreferenceChangeListener listener, final Preferences prefs,
-                                                final String key, final String value, final int count) {
+    protected ScheduledFuture<?> expectPrefChange(final PreferenceChangeListener listener, final Preferences prefs,
+                                                  final String key, final String value, final int count) {
         final ArgumentCaptor<PreferenceChangeEvent> captor = ArgumentCaptor.forClass(PreferenceChangeEvent.class);
 
         final Runnable task = new Runnable() {

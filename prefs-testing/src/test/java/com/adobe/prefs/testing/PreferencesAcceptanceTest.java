@@ -89,7 +89,7 @@ public abstract class PreferencesAcceptanceTest<F extends PreferencesFactory, P 
     }
 
     @Test(dataProvider = "root", priority = -1, groups = {"prefs", "hierarchy"},
-            dependsOnGroups = "factory", timeOut = 1000L)
+            dependsOnGroups = "factory", timeOut = 5000L)
     public void shouldIsolateRootNodes(Preferences root) throws Exception {
         assertFalse(root.nodeExists(namespace)); // the second invocation fails if the two root nodes are the same
         final Preferences prefs = root.node(namespace);
@@ -97,7 +97,7 @@ public abstract class PreferencesAcceptanceTest<F extends PreferencesFactory, P 
         assertSame(root.node('/' + namespace), prefs);
     }
 
-    @Test(dataProvider = "chroot", groups = {"prefs", "hierarchy"}, dependsOnGroups = "factory", timeOut = 1000L)
+    @Test(dataProvider = "chroot", groups = {"prefs", "hierarchy"}, dependsOnGroups = "factory", timeOut = 5000L)
     public void shouldCreateChildren(Preferences prefs) throws Exception {
         final String childName = "child";
 
@@ -114,7 +114,7 @@ public abstract class PreferencesAcceptanceTest<F extends PreferencesFactory, P 
         assertEquals(child.isUserNode(), prefs.isUserNode(), "wrong userNode flag");
     }
 
-    @Test(dataProvider = "chroot", groups = {"prefs", "hierarchy"}, dependsOnGroups = "factory", timeOut = 1000L)
+    @Test(dataProvider = "chroot", groups = {"prefs", "hierarchy"}, dependsOnGroups = "factory", timeOut = 5000L)
     public void shouldCreateHierarchy(Preferences prefs) throws Exception {
         final Preferences a1 = prefs.node("a1");
         final Preferences a2 = a1.node("a2");
@@ -131,7 +131,7 @@ public abstract class PreferencesAcceptanceTest<F extends PreferencesFactory, P 
 
     @Test(dataProvider = "chroot", groups = {"prefs", "hierarchy"}, priority = 1,
             dependsOnMethods = "shouldCreateHierarchy", expectedExceptions = IllegalStateException.class,
-            timeOut = 1000L)
+            timeOut = 5000L)
     public void shouldRemoveChildren(Preferences prefs) throws Exception {
         assertTrue(prefs.nodeExists("a1/a2/a3"), "precondition failed");
         prefs.node("a1/a2/a3").removeNode();
@@ -146,7 +146,7 @@ public abstract class PreferencesAcceptanceTest<F extends PreferencesFactory, P 
         a1.get("k", "v");
     }
 
-    @Test(dataProvider = "chroot", groups = {"prefs", "kv"}, dependsOnGroups = "factory", timeOut = 1000L)
+    @Test(dataProvider = "chroot", groups = {"prefs", "kv"}, dependsOnGroups = "factory", timeOut = 5000L)
     public void shouldStoreKeyValues(Preferences prefs) {
         final Preferences container = prefs.node("container");
         container.put("k", "v");
@@ -157,7 +157,7 @@ public abstract class PreferencesAcceptanceTest<F extends PreferencesFactory, P 
     }
 
     @Test(dataProvider = "chroot", groups = {"prefs", "kv"},
-            dependsOnMethods = "shouldStoreKeyValues", timeOut = 1000L)
+            dependsOnMethods = "shouldStoreKeyValues", timeOut = 5000L)
     public void shouldRemoveKeys(Preferences prefs) throws Exception {
         final Preferences container = prefs.node("container");
         assertTrue(asList(container.keys()).contains("k"));
@@ -168,7 +168,7 @@ public abstract class PreferencesAcceptanceTest<F extends PreferencesFactory, P 
     }
 
     @Test(dataProvider = "chroot", groups = {"prefs", "hierarchy", "kv"},
-            dependsOnGroups = "factory", timeOut = 1000L)
+            dependsOnGroups = "factory", timeOut = 5000L)
     public void shouldIsolateKeysAndChildren(Preferences prefs) throws Exception {
         final Preferences mixed = prefs.node("mixed");
         final String keyOnly = "keyOnly";
@@ -191,7 +191,7 @@ public abstract class PreferencesAcceptanceTest<F extends PreferencesFactory, P 
     }
 
     @Test(dataProvider = "chroot", groups = {"prefs", "hierarchy", "kv"},
-            dependsOnMethods = "shouldIsolateKeysAndChildren", timeOut = 1000L)
+            dependsOnMethods = "shouldIsolateKeysAndChildren", timeOut = 5000L)
     public void shouldAllowSameNameForBoth(Preferences prefs) throws Exception {
         final Preferences mixed = prefs.node("mixed");
         final String both = "bothKeyAndChild";
@@ -211,55 +211,55 @@ public abstract class PreferencesAcceptanceTest<F extends PreferencesFactory, P 
     }
 
     @Test(dataProvider = "chroot", groups = {"prefs", "hierarchy", "notifications"},
-            dependsOnGroups = "factory", timeOut = 3000L)
+            dependsOnGroups = "factory", timeOut = 10000L)
     public void shouldTriggerNodeAdded(Preferences prefs) throws Exception {
         final Preferences watched = prefs.node("watched");
         final NodeChangeListener listener = nodeListener(watched);
         final Preferences n1 = watched.node("n1");
-        testNodeAdded(listener, watched, n1.name(), 1).get();
+        expectNodeAdded(listener, watched, n1.name(), 1).get();
         watched.node("n1"); // not a new node, so the invocation count should stay the same
         prefs.node("n0");   // shouldn't trigger anything for our listener, as it's a parent event
-        testNodeAdded(listener, watched, n1.name(), 1).get();
+        expectNodeAdded(listener, watched, n1.name(), 1).get();
 
         final Preferences n2 = watched.node("n2");
-        testNodeAdded(listener, watched, n2.name(), 2).get();
+        expectNodeAdded(listener, watched, n2.name(), 2).get();
 
         watched.node("n3/nested");
-        testNodeAdded(listener, watched, "n3", 3).get();
+        expectNodeAdded(listener, watched, "n3", 3).get();
     }
 
     @Test(dataProvider = "chroot", groups = {"prefs", "hierarchy", "notifications"},
-            dependsOnMethods = "shouldTriggerNodeAdded", timeOut = 3000L)
+            dependsOnMethods = "shouldTriggerNodeAdded", timeOut = 10000L)
     public void shouldTriggerNodeRemoved(Preferences prefs) throws Exception {
         final Preferences watched = prefs.node("watched");
         final NodeChangeListener listener = nodeListener(watched);
 
         watched.node("n1").removeNode();
-        testNodeRemoved(listener, watched, "n1", 1).get();
+        expectNodeRemoved(listener, watched, "n1", 1).get();
 
         watched.node("n2").removeNode();
-        testNodeRemoved(listener, watched, "n2", 2).get();
+        expectNodeRemoved(listener, watched, "n2", 2).get();
 
         watched.node("n3/nested").removeNode();
-        testNodeRemoved(listener, watched, "n2", 2).get();
+        expectNodeRemoved(listener, watched, "n2", 2).get();
 
         watched.node("n3").removeNode();
-        testNodeRemoved(listener, watched, "n3", 3).get();
+        expectNodeRemoved(listener, watched, "n3", 3).get();
     }
 
     @Test(dataProvider = "chroot", groups = {"prefs", "kv", "notifications"},
-            dependsOnGroups = "factory", timeOut = 1000L)
+            dependsOnGroups = "factory", timeOut = 5000L)
     public void shouldTriggerPreferenceChange(Preferences prefs) throws Exception {
         final Preferences watched = prefs.node("watchedContainer");
         final PreferenceChangeListener listener = prefListener(watched);
         watched.putFloat("key", 1.2F);
-        testPrefChange(listener, watched, "key", "1.2", 1).get();
+        expectPrefChange(listener, watched, "key", "1.2", 1).get();
         watched.remove("key");
-        testPrefChange(listener, watched, "key", null, 2).get();
+        expectPrefChange(listener, watched, "key", null, 2).get();
     }
 
     @Test(dataProvider = "chroot", groups = {"prefs", "concurrency"},
-            dependsOnGroups = {"hierarchy", "kv"}, invocationCount = 12, threadPoolSize = 4, timeOut = 10000L)
+            dependsOnGroups = {"hierarchy", "kv"}, invocationCount = 15, threadPoolSize = 6, timeOut = 30000L)
     public void concurrencyTest(Preferences prefs) throws Exception {
 
         final Preferences child = prefs.node(UUID.randomUUID().toString());
@@ -271,13 +271,13 @@ public abstract class PreferencesAcceptanceTest<F extends PreferencesFactory, P 
         prefs.putInt(key, 12);
         final Preferences grandson = child.node("grandson");
         child.putBoolean(key, true);
-        ScheduledFuture<?> nodeAdded = testNodeAdded(nodeListener, child, grandson.name(), 1);
-        ScheduledFuture<?> prefSet = testPrefChange(prefListener, child, key, "true", 1);
+        ScheduledFuture<?> nodeAdded = expectNodeAdded(nodeListener, child, grandson.name(), 1);
+        ScheduledFuture<?> prefSet = expectPrefChange(prefListener, child, key, "true", 1);
         assertEquals(prefs.getInt(key, 0), 12);
         assertTrue(child.getBoolean(key, false));
 
         grandson.removeNode();
-        ScheduledFuture<?> nodeRemoved = testNodeRemoved(nodeListener, child, grandson.name(), 1);
+        ScheduledFuture<?> nodeRemoved = expectNodeRemoved(nodeListener, child, grandson.name(), 1);
 
         prefSet.get();
 
@@ -288,7 +288,7 @@ public abstract class PreferencesAcceptanceTest<F extends PreferencesFactory, P 
 
         nodeAdded.get();
         nodeRemoved.get();
-        testPrefChange(prefListener, child, key, null, 2).get();
+        expectPrefChange(prefListener, child, key, null, 2).get();
 
     }
 
