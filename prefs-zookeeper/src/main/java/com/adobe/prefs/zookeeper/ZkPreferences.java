@@ -9,6 +9,7 @@ import org.apache.curator.framework.recipes.cache.PathChildrenCache;
 import org.apache.curator.framework.recipes.cache.PathChildrenCacheEvent;
 import org.apache.curator.framework.recipes.cache.PathChildrenCacheListener;
 import org.apache.zookeeper.KeeperException.NoNodeException;
+import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,6 +20,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
@@ -29,6 +31,7 @@ import java.util.prefs.NodeChangeListener;
 import java.util.prefs.PreferenceChangeEvent;
 import java.util.prefs.PreferenceChangeListener;
 import java.util.prefs.Preferences;
+import java.util.stream.Stream;
 
 import static com.adobe.prefs.zookeeper.ZkUtils.basename;
 import static com.adobe.prefs.zookeeper.ZkUtils.bytes;
@@ -227,6 +230,8 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
         try {
             if (curator.checkExists().forPath(absolutePath()) != null) {
                 curator.delete().deletingChildrenIfNeeded().forPath(absolutePath());
+                // required as the parent will ignore the CHILD_REMOVED event since this child will be already gone
+                // worst case scenario, the remove notification will be triggered twice
                 parent().triggerChildRemoved(this);
             }
         } catch (NoNodeException e) {
@@ -287,7 +292,7 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
     }
 
     private void startWatching() {
-        logger.debug("Syncing preference node {}", this);
+        logger.debug("Registering as listener for preference node {}", this);
         try {
             pcc.start();
             pcc.getListenable().addListener(this);
@@ -323,8 +328,12 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
                 logger.debug("Creating a synthetic child `{}` to mark path as node by increasing the 'cversion': {}",
                         CHILD_MARKER, absolutePath());
                 final String markerPath = path(CHILD_MARKER);
-                curator.create().creatingParentsIfNeeded().forPath(markerPath, CHILD_MARKER.getBytes());
-                curator.delete().forPath(markerPath);
+                try {
+                    curator.create().creatingParentsIfNeeded().forPath(markerPath, CHILD_MARKER.getBytes());
+                    curator.delete().forPath(markerPath);
+                } catch (NodeExistsException e) {
+                    logger.debug("Node already created in zookeeper: {}", markerPath);
+                }
             }
             assert isContainerNode(curator.checkExists().forPath(absolutePath())) :
                     "node not marked as child node: " + absolutePath();
@@ -376,22 +385,23 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
             final String value = string(childData.getData());
             switch (event.getType()) {
                 case CHILD_REMOVED:
-                    try {
-                        if (isValueNode(childData.getStat())) {
-                            triggerPreferenceDropped(name);
-                        }
-                    } catch (IllegalStateException e) {
-                        logger.debug("Could not remove preference key `{}` from {}: {}", name, this, e.toString());
+                    if (isValueNode(childData.getStat())) {
+                        triggerPreferenceDropped(name);
                     }
-                    try {
-                        if (nodeExists(name)) {
-                            final Preferences child = node(name);
-                            child.removeNode();    // remove node from local cache and notify listeners
-                            triggerChildRemoved(child);
+                    final Optional<AbstractPreferences> child = Stream.of(cachedChildren())
+                            .parallel()
+                            .filter(kid -> kid.name().equals(name))
+                            .findAny();
+                    child.ifPresent(kid -> {
+                        try {
+                            kid.removeNode();
+                            triggerChildRemoved(kid);
+                        } catch (IllegalStateException e) {
+                            logger.debug("Node `{}` already removed from {}: {}", name, this, e.toString());
+                        } catch (BackingStoreException e) {
+                            logger.warn("Child removal failed", e);
                         }
-                    } catch (IllegalStateException e) {
-                        logger.debug("Node `{}` already removed from {}: {}", name, this, e.toString());
-                    }
+                    });
                     break;
                 case CHILD_ADDED:
                     if (isContainerNode(childData.getStat())) {
