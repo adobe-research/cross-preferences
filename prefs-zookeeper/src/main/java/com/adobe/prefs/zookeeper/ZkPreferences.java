@@ -334,10 +334,10 @@ class ZkPreferences extends AbstractPreferences implements PathChildrenCacheList
                 } catch (NodeExistsException e) {
                     logger.debug("Node already created in zookeeper: {}", markerPath);
                 }
+                logger.info("Created zookeeper node for {}", this);
             }
             assert isContainerNode(curator.checkExists().forPath(absolutePath())) :
                     "node not marked as child node: " + absolutePath();
-            logger.info("Created zookeeper node for {}", this);
         } catch (Exception e) {
             throw new BackingStoreException(e);
         }
