@@ -4,7 +4,7 @@
 
     <groupId>com.adobe.prefs</groupId>
     <artifactId>cross-preferences</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>0.2.3-SNAPSHOT</version>
     <modules>
         <module>prefs-testing</module>
         <module>prefs-admin</module>
@@ -29,8 +29,8 @@
         <freemarker.version>2.3.28</freemarker.version>
         <spring-plugin.version>1.2.0.RELEASE</spring-plugin.version>
         <spring-hateoas.version>0.25.1.RELEASE</spring-hateoas.version>
-        <spring.version>5.1.5.RELEASE</spring.version>
-        <jackson.version>2.9.8</jackson.version>
+        <spring.version>5.2.7.RELEASE</spring.version>
+        <jackson.version>2.11.0</jackson.version>
         <zookeeper.version>3.4.13</zookeeper.version>
         <curator.version>4.1.0</curator.version>
         <etcd-client.version>0.1.2</etcd-client.version>
