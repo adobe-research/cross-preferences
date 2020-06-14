@@ -31,7 +31,7 @@
         <spring-hateoas.version>0.25.1.RELEASE</spring-hateoas.version>
         <spring.version>5.2.7.RELEASE</spring.version>
         <jackson.version>2.11.0</jackson.version>
-        <zookeeper.version>3.4.13</zookeeper.version>
+        <zookeeper.version>3.4.14</zookeeper.version>
         <curator.version>4.1.0</curator.version>
         <etcd-client.version>0.1.2</etcd-client.version>
         <testng.version>6.14.3</testng.version>
